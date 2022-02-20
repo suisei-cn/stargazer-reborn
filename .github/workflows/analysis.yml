@@ -16,7 +16,6 @@ jobs:
         name: Setup Cargo Toolchain 🛎️
         with:
           components: clippy
-          toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
       - run: cargo install --locked clippy-sarif

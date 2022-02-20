@@ -19,7 +19,6 @@ jobs:
         name: Setup Cargo Toolchain 🛎️
         with:
           components: rustfmt, clippy
-          toolchain: stable
           default: true
       - uses: Swatinem/rust-cache@v1
       - uses: mbrobbel/rustfmt-check@master
@@ -42,7 +41,6 @@ jobs:
         name: Setup Cargo Toolchain 🛎️
         with:
           profile: minimal
-          toolchain: stable
           default: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1

@@ -1,4 +1,4 @@
-//! Schema for the entity collection.
+//! Models for the entity collection.
 use mongodb::bson::{Document, Uuid};
 use serde::{Deserialize, Serialize};
 
