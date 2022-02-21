@@ -1,11 +1,10 @@
 //! Worker node and worker group.
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use std::time::Duration;
 
 use futures_util::{Sink, Stream};
 use parking_lot::Mutex;
-use tarpc::client::Config;
+use tarpc::client::Config as ClientConfig;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::{Error as WsError, Message};
 use tracing::{debug, error};
@@ -13,6 +12,8 @@ use uuid::Uuid;
 
 use sg_core::adapter::WsTransport;
 use sg_core::protocol::WorkerRpcClient;
+
+use crate::config::Config;
 
 /// Worker group for homogeneous workers.
 #[derive(Debug, Default)]
@@ -66,6 +67,16 @@ impl WorkerGroupImpl {
         self.workers.remove(&id);
         // TODO rebalance
     }
+    /// Returns the number of elements in the worker group.
+    #[allow(clippy::must_use_candidate)]
+    pub fn len(&self) -> usize {
+        self.workers.len()
+    }
+    /// Returns `true` if the map contains no elements.
+    #[allow(clippy::must_use_candidate)]
+    pub fn is_empty(&self) -> bool {
+        self.workers.is_empty()
+    }
 }
 
 /// Task worker node.
@@ -83,7 +94,7 @@ pub struct Worker {
 
 impl Worker {
     /// Create a new worker from given stream and worker group.
-    pub fn new<S>(id: Uuid, stream: S, parent: WeakWorkerGroup) -> Arc<Self>
+    pub fn new<S>(id: Uuid, stream: S, parent: WeakWorkerGroup, config: Config) -> Arc<Self>
     where
         S: Stream<Item = Result<Message, WsError>>
             + Sink<Message, Error = WsError>
@@ -94,7 +105,7 @@ impl Worker {
         Arc::new_cyclic(|this: &Weak<Self>| {
             let this = this.clone();
             let watchdog_job = tokio::spawn(async move {
-                let mut check_interval = tokio::time::interval(Duration::from_secs(10));
+                let mut check_interval = tokio::time::interval(config.ping_interval);
                 loop {
                     check_interval.tick().await;
 
@@ -119,7 +130,8 @@ impl Worker {
             Self {
                 id,
                 parent,
-                client: WorkerRpcClient::new(Config::default(), WsTransport::new(stream)).spawn(),
+                client: WorkerRpcClient::new(ClientConfig::default(), WsTransport::new(stream))
+                    .spawn(),
                 watchdog_job,
             }
         })

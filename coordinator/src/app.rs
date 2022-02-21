@@ -14,6 +14,7 @@ use tokio_tungstenite::tungstenite::http::{HeaderMap, StatusCode};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
+use crate::config::Config;
 use crate::worker::{Worker, WorkerGroup};
 
 /// The application state.
@@ -21,6 +22,11 @@ use crate::worker::{Worker, WorkerGroup};
 pub struct App(Arc<AppImpl>);
 
 impl App {
+    /// Create a new application state.
+    #[must_use]
+    pub fn new(config: Config) -> Self {
+        Self(Arc::new(AppImpl::new(config)))
+    }
     /// Serve the application.
     ///
     /// # Errors
@@ -40,12 +46,17 @@ impl App {
             }
         }
     }
+    #[must_use]
+    pub fn inner(&self) -> &AppImpl {
+        &self.0
+    }
 }
 
 /// Implementation of the application state.
 #[derive(Debug, Default)]
 pub struct AppImpl {
-    worker_groups: Mutex<HashMap<String, WorkerGroup>>,
+    pub worker_groups: Mutex<HashMap<String, WorkerGroup>>,
+    config: Config,
 }
 
 struct WorkerMeta {
@@ -73,6 +84,14 @@ impl TryFrom<&HeaderMap> for WorkerMeta {
 }
 
 impl AppImpl {
+    /// Create a new application state impl.
+    #[must_use]
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            ..Default::default()
+        }
+    }
     /// Accept a new worker.
     ///
     /// # Errors
@@ -107,7 +126,12 @@ impl AppImpl {
         let worker_group = worker_groups
             .entry(worker_meta.ty)
             .or_insert_with(WorkerGroup::new);
-        let worker = Worker::new(worker_meta.id, stream, worker_group.weak());
+        let worker = Worker::new(
+            worker_meta.id,
+            stream,
+            worker_group.weak(),
+            self.config,
+        );
         worker_group.with(|worker_group| worker_group.add_worker(worker));
 
         Ok(())

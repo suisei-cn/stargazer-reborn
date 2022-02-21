@@ -11,6 +11,7 @@ use tracing::level_filters::LevelFilter;
 use crate::app::App;
 
 pub mod app;
+pub mod config;
 pub mod worker;
 
 #[tokio::main]

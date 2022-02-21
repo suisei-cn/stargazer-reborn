@@ -15,6 +15,11 @@ sg-core = { package = "core", path = "../core" }
 tarpc = { version = "0.27", features = ["tokio1"] }
 tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
 tokio-tungstenite = "0.17"
+figment = { version = "0.10", features = ["env"] }
+humantime-serde = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = "0.8"
+
+[dev-dependencies]
+figment = { version = "0.10", features = ["test"] }
