@@ -15,11 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - uses: actions-rs/toolchain@v1
+      - run: rustup show
         name: Setup Cargo Toolchain 🛎️
-        with:
-          components: rustfmt, clippy
-          default: true
       - uses: Swatinem/rust-cache@v1
       - uses: mbrobbel/rustfmt-check@master
         name: Check Code Format (auto fix) 🔧
@@ -37,11 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - uses: actions-rs/toolchain@v1
+      - run: rustup show
         name: Setup Cargo Toolchain 🛎️
-        with:
-          profile: minimal
-          default: true
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         name: Running Tests 🚀

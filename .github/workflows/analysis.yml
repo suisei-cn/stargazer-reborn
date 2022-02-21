@@ -12,11 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - uses: actions-rs/toolchain@v1
+      - run: rustup show
         name: Setup Cargo Toolchain 🛎️
-        with:
-          components: clippy
-          override: true
       - uses: Swatinem/rust-cache@v1
       - run: cargo install --locked clippy-sarif
         name: Install clippy-sarif 🛎️
