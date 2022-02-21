@@ -126,12 +126,7 @@ impl AppImpl {
         let worker_group = worker_groups
             .entry(worker_meta.ty)
             .or_insert_with(WorkerGroup::new);
-        let worker = Worker::new(
-            worker_meta.id,
-            stream,
-            worker_group.weak(),
-            self.config,
-        );
+        let worker = Worker::new(worker_meta.id, stream, worker_group.weak(), self.config);
         worker_group.with(|worker_group| worker_group.add_worker(worker));
 
         Ok(())
