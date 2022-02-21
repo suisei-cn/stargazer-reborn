@@ -5,14 +5,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bson = "2.1"
 eyre = "0.6"
+futures-util = { version = "0.3", features = ["sink"] }
 mongodb = "2.1"
 serde = { version = "1.0", features = ["derive"] }
 tarpc = { version = "0.27", features = ["serde1"] }
-uuid = "0.8"
-tokio-tungstenite = "0.17"
-futures-util = { version = "0.3", features = ["sink"] }
 thiserror = "1.0"
-bson = "2.1"
+tokio-tungstenite = "0.17"
+uuid = "0.8"
 [dev-dependencies]
 tokio = { version = "1.17", features = ["net"] }

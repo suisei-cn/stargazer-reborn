@@ -5,16 +5,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mongodb = "2.1"
-uuid = "0.8"
 eyre = "0.6"
+futures-util = { version = "0.3", features = ["sink"] }
+mongodb = "2.1"
 parking_lot = "0.12"
+rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
-tracing = "0.1"
-tracing-subscriber = "0.3"
-tokio-tungstenite = "0.17"
 sg-core = { package = "core", path = "../core" }
 tarpc = { version = "0.27", features = ["tokio1"] }
-futures-util = { version = "0.3", features = ["sink"] }
-rand = "0.8"
+tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
+tokio-tungstenite = "0.17"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = "0.8"

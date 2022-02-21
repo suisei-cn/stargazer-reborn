@@ -29,7 +29,7 @@ impl App {
         info!("Listening on {}", addr);
         loop {
             if let Ok((socket, addr)) = socket.accept().await {
-                info!(addr=%addr, "Accepting connection");
+                info!(addr = %addr, "Accepting connection");
                 let this = self.0.clone();
                 tokio::spawn(async move {
                     if let Err(e) = this.accept_connection(socket).await {
