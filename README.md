@@ -9,4 +9,5 @@ This new version attempts to utilize a more modern microservice architecture, an
 develop and deploy.
 
 ## License
+
 This project is licensed under MIT License - see the [LICENSE](LICENSE) file for details.

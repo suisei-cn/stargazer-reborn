@@ -15,7 +15,7 @@ need_stdout = false
 watch = ["tests", "benches", "examples"]
 
 [jobs.clippy]
-command = ["cargo", "clippy", "--all", "--tests", "--color", "always", "--", "-W", "clippy::all", "-W", "clippy::nursery", "-W", "clippy::pedantic"]
+command = ["cargo", "clippy", "--workspace", "--tests", "--color", "always", "--", "-W", "clippy::all", "-W", "clippy::nursery", "-W", "clippy::pedantic"]
 need_stdout = false
 
 [jobs.clippy-all]
