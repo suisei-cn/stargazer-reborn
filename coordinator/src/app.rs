@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::result::Result as StdResult;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use eyre::Result;
 use parking_lot::Mutex;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use tokio_tungstenite::tungstenite::http::HeaderMap;
+use tokio_tungstenite::tungstenite::http::{HeaderMap, StatusCode};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
@@ -56,11 +57,11 @@ impl TryFrom<&HeaderMap> for WorkerMeta {
     type Error = Box<dyn Error>;
 
     fn try_from(headers: &HeaderMap) -> StdResult<Self, Box<dyn Error>> {
-        let id = Uuid::from_slice(
+        let id = Uuid::from_str(
             headers
                 .get("sg-worker-id")
                 .ok_or("missing header: sg-worker-id")?
-                .as_bytes(),
+                .to_str()?,
         )?;
         let ty = headers
             .get("sg-worker-ty")
@@ -86,10 +87,12 @@ impl AppImpl {
             let stream = tokio_tungstenite::accept_hdr_async(
                 socket,
                 |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
-                    worker_meta = Some(
-                        WorkerMeta::try_from(req.headers())
-                            .map_err(|e| ErrorResponse::new(Some(e.to_string())))?,
-                    );
+                    worker_meta = Some(WorkerMeta::try_from(req.headers()).map_err(|e| {
+                        error!("Invalid header: {}", e);
+                        let mut resp = ErrorResponse::new(Some(e.to_string()));
+                        *resp.status_mut() = StatusCode::BAD_REQUEST;
+                        resp
+                    })?);
                     Ok(resp)
                 },
             )
