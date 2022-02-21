@@ -1,14 +1,8 @@
-use uuid::Uuid;
+//! RPC protocol.
 
-use crate::error::SerializedError;
-use crate::StringError;
-
+/// RPC protocol for worker-coordinator communication.
 #[tarpc::service]
-trait WorkerRpc {
+pub trait WorkerRpc {
+    /// Ping the worker.
     async fn ping(id: u64) -> u64;
-}
-
-#[tarpc::service]
-trait CoordinatorRpc {
-    async fn register(id: Uuid, ty: String) -> Result<(), SerializedError>;
 }
