@@ -10,12 +10,19 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use uuid::Uuid;
 
 use crate::adapter::WsTransport;
+use crate::models::Task;
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]
 pub trait WorkerRpc {
     /// Ping the worker.
     async fn ping(id: u64) -> u64;
+    /// Add a task to the worker. Return `false` if the task already exists.
+    async fn add_task(task: Task) -> bool;
+    /// Remove a task from the worker. Return `false` if the task was not found.
+    async fn remove_task(id: Uuid) -> bool;
+    /// Get the list of tasks running on the worker.
+    async fn tasks() -> Vec<Task>;
 }
 
 /// Extension trait for `WorkerRpc`.

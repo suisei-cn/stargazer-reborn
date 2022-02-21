@@ -5,6 +5,7 @@ use tarpc::context::Context;
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
+use sg_core::models::Task;
 use sg_core::protocol::{WorkerRpc, WorkerRpcExt};
 
 use crate::config::Config;
@@ -17,6 +18,15 @@ struct DummyWorker;
 impl WorkerRpc for DummyWorker {
     async fn ping(self, _: Context, id: u64) -> u64 {
         id
+    }
+    async fn add_task(self, _: Context, _task: Task) -> bool {
+        todo!()
+    }
+    async fn remove_task(self, _: Context, _id: Uuid) -> bool {
+        todo!()
+    }
+    async fn tasks(self, _: Context) -> Vec<Task> {
+        todo!()
     }
 }
 
@@ -42,13 +52,13 @@ async fn must_join_disconnect() {
 
         sleep(Duration::from_millis(200)).await;
         assert_eq!(
-            app.inner().worker_groups.lock()["dummy"].with(|this| this.len()),
+            app.inner().worker_groups.lock()["dummy"].with(|this| this.worker_len()),
             1
         );
 
         sleep(Duration::from_millis(200)).await;
         assert_eq!(
-            app.inner().worker_groups.lock()["dummy"].with(|this| this.len()),
+            app.inner().worker_groups.lock()["dummy"].with(|this| this.worker_len()),
             0
         );
 
