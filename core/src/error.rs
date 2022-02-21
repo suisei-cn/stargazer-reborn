@@ -9,11 +9,9 @@ use thiserror::Error;
 /// Errors that may occur during transport.
 #[derive(Debug, Error)]
 pub enum TransportError {
-    #[error("serialize error")]
-    Serialize(#[from] bson::ser::Error),
-    #[error("deserialize error")]
-    Deserialize(#[from] bson::de::Error),
-    #[error("websocket error")]
+    #[error("Bincode error")]
+    Serialize(#[from] bincode::Error),
+    #[error("Websocket error")]
     Websocket(#[from] tokio_tungstenite::tungstenite::Error),
 }
 
