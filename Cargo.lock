@@ -156,9 +156,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "consistent_hash_ring"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6478ccd2238cf23733ad631f1790b2973e66c7b4cf2f63c592f61cd5f6b35bf2"
+dependencies = [
+ "fnv",
+]
+
+[[package]]
 name = "coordinator"
 version = "0.1.0"
 dependencies = [
+ "consistent_hash_ring",
  "core",
  "eyre",
  "figment",
