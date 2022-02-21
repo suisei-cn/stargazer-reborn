@@ -1,23 +1,34 @@
+//! Errors for the core library.
 use std::error::Error;
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 
 use eyre::Report;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Errors that may occur during transport.
+#[derive(Debug, Error)]
+pub enum TransportError {
+    #[error("serialize error")]
+    Serialize(#[from] bson::ser::Error),
+    #[error("deserialize error")]
+    Deserialize(#[from] bson::de::Error),
+    #[error("websocket error")]
+    Websocket(#[from] tokio_tungstenite::tungstenite::Error),
+}
 
 /// Represents a end-user friendly serializable error.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedError {
     desc: String,
     cause: Option<Box<SerializedError>>,
-    suggestion: Option<String>,
 }
 
 impl SerializedError {
     /// Convert `SerializedError` into `eyre::Report`.
     #[must_use]
     pub fn into_report(self) -> Report {
-        let suggestion: Value = self.suggestion.clone().map(Into::into).unwrap_or_default();
-        Report::new(self).section("suggestion", suggestion)
+        Report::new(self)
     }
 
     /// Convert an error into `SerializedError`.
@@ -32,14 +43,12 @@ impl SerializedError {
                         Some(Self {
                             desc: x.to_string(),
                             cause: None,
-                            suggestion: None,
                         })
                     },
                     |acc| {
                         Some(Self {
                             desc: x.to_string(),
                             cause: Some(Box::new(acc)),
-                            suggestion: None,
                         })
                     },
                 )
@@ -48,7 +57,6 @@ impl SerializedError {
         Self {
             desc: e.desc,
             cause: e.cause,
-            suggestion: report.get_suggestion().map(ToString::to_string),
         }
     }
 }
