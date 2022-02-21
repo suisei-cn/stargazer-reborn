@@ -14,6 +14,9 @@ pub mod app;
 pub mod config;
 pub mod worker;
 
+#[cfg(test)]
+mod tests;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()

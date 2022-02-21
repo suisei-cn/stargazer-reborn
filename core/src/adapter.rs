@@ -85,6 +85,7 @@ mod tests {
     {
     }
 
+    #[test]
     fn must_adapter_transport() {
         assert_transport::<WsTransport<WebSocketStream<TcpStream>, _>>();
     }
