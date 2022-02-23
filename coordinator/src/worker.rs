@@ -5,12 +5,13 @@ use std::sync::{Arc, Weak};
 
 use consistent_hash_ring::Ring;
 use futures_util::{Sink, Stream};
-use parking_lot::Mutex;
+use tap::TapFallible;
 use tarpc::client::{Config as ClientConfig, RpcError};
 use tarpc::context::Context;
-use tokio::task::JoinHandle;
+use tokio::sync::Mutex;
+use tokio::sync::Notify;
 use tokio_tungstenite::tungstenite::{Error as WsError, Message};
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use sg_core::adapter::WsTransport;
@@ -18,37 +19,77 @@ use sg_core::models::Task;
 use sg_core::protocol::WorkerRpcClient;
 
 use crate::config::Config;
+use crate::utils::ScopedJoinHandle;
 
 /// Worker group for homogeneous workers.
-#[derive(Debug, Default)]
-pub struct WorkerGroup(Arc<Mutex<WorkerGroupImpl>>);
+#[derive(Debug)]
+pub struct WorkerGroup {
+    inner: Arc<Mutex<WorkerGroupImpl>>,
+    balance_job: Arc<ScopedJoinHandle<()>>,
+}
+
+impl Default for WorkerGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl WorkerGroup {
     /// Create a new worker group.
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        let balance_notify = Arc::new(Notify::new());
+        let inner = Arc::new(Mutex::new(WorkerGroupImpl::new(balance_notify.clone())));
+
+        let task = {
+            let inner = inner.clone();
+            async move {
+                loop {
+                    balance_notify.notified().await;
+
+                    if !inner.lock().await.balance().await {
+                        // Balance failed, schedule a balance immediately.
+                        balance_notify.notify_one();
+                    }
+                }
+            }
+        };
+        let balance_job = Arc::new(ScopedJoinHandle(tokio::spawn(task)));
+
+        Self { inner, balance_job }
     }
     /// Get a weak reference to the worker group.
     #[must_use]
     pub fn weak(&self) -> WeakWorkerGroup {
-        WeakWorkerGroup(Arc::downgrade(&self.0))
+        WeakWorkerGroup {
+            inner: Arc::downgrade(&self.inner),
+            balance_job: Arc::downgrade(&self.balance_job),
+        }
     }
     /// Lock the worker group and mutate its state.
-    pub fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O) -> O {
-        let mut lock = self.0.lock();
-        f(&mut *lock)
+    pub async fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O) -> O {
+        let mut lock = self.inner.lock().await;
+        let output = f(&mut *lock);
+        drop(lock);
+        output
     }
 }
 
 /// Weak reference to a worker group.
 #[derive(Debug)]
-pub struct WeakWorkerGroup(Weak<Mutex<WorkerGroupImpl>>);
+pub struct WeakWorkerGroup {
+    inner: Weak<Mutex<WorkerGroupImpl>>,
+    balance_job: Weak<ScopedJoinHandle<()>>,
+}
 
 impl WeakWorkerGroup {
     /// Upgrade the weak reference to a strong reference.
+    #[must_use]
     pub fn upgrade(&self) -> Option<WorkerGroup> {
-        self.0.upgrade().map(WorkerGroup)
+        Some(WorkerGroup {
+            inner: self.inner.upgrade()?,
+            balance_job: self.balance_job.upgrade()?,
+        })
     }
 }
 
@@ -61,11 +102,11 @@ struct BoundTask {
 }
 
 /// Worker group implementation.
-#[derive(Default)]
 pub struct WorkerGroupImpl {
     workers: HashMap<Uuid, Arc<Worker>>,
     tasks: HashMap<Uuid, BoundTask>,
     ring: Ring</* worker */ Uuid>,
+    balance_notify: Arc<Notify>,
 }
 
 impl Debug for WorkerGroupImpl {
@@ -95,29 +136,41 @@ fn check_resp(
         Ok(true) => Ok(()),
         Ok(false) => {
             error!(%task_id, %worker_id, false_msg);
-            Err(task_id)
+            Err(worker_id)
         }
         Err(e) => {
             error!(%task_id, %worker_id, "{}: {}", err_msg, e);
-            Err(task_id)
+            Err(worker_id)
         }
     }
 }
 
 impl WorkerGroupImpl {
+    /// Create a new worker group implementation.
+    #[must_use]
+    pub fn new(balance_notify: Arc<Notify>) -> Self {
+        Self {
+            workers: HashMap::new(),
+            tasks: HashMap::new(),
+            ring: Ring::default(),
+            balance_notify,
+        }
+    }
     /// Add a new worker to the group.
     pub fn add_worker(&mut self, worker: Arc<Worker>) {
         debug!(worker_id = %worker.id, "Add worker to group");
         self.ring.insert(worker.id);
         self.workers.insert(worker.id, worker);
-        // TODO schedule balance
+
+        self.balance_notify.notify_one();
     }
     /// Remove a worker from the group.
     pub fn remove_worker(&mut self, id: Uuid) {
         debug!(worker_id = %id, "Remove worker from group");
         self.ring.remove(&id);
         self.workers.remove(&id);
-        // TODO schedule balance
+
+        self.balance_notify.notify_one();
     }
     /// Add a task to the group.
     pub fn add_task(&mut self, task: Task) {
@@ -128,13 +181,29 @@ impl WorkerGroupImpl {
             workers: None,
         };
         self.tasks.insert(id, bound_task);
-        // TODO schedule balance
+
+        self.balance_notify.notify_one();
     }
     /// Remove a task from the group.
     pub fn remove_task(&mut self, id: Uuid) {
         debug!(task_id = %id, "Remove task from group");
         self.tasks.remove(&id);
-        // TODO schedule balance
+
+        self.balance_notify.notify_one();
+    }
+
+    /// Balance the group.
+    ///
+    /// Workers not responding or inconsistent will be removed. Return `false` if there's a worker removed.
+    /// Balance should be called again in this case.
+    pub async fn balance(&mut self) -> bool {
+        self.balance_impl()
+            .await
+            .tap_err(|bad_worker| {
+                warn!(worker_id=%bad_worker, "Balance: remove bad worker");
+                self.remove_worker(*bad_worker);
+            })
+            .is_ok()
     }
 
     /// Core implementation to balance the group.
@@ -146,6 +215,11 @@ impl WorkerGroupImpl {
     async fn balance_impl(&mut self) -> Result<(), Uuid> {
         // TODO instrument this future
 
+        if self.ring.is_empty() {
+            error!("Balance: No worker in worker group");
+            return Ok(());
+        }
+
         // Remove gone tasks.
         for worker in self.workers.values_mut() {
             // Note that we collect tasks_gone first to avoid holding the lock across awaits.
@@ -154,12 +228,14 @@ impl WorkerGroupImpl {
             let tasks_gone: Vec<_> = worker
                 .tasks
                 .lock()
+                .await
                 .iter()
                 .filter(|task| !self.tasks.contains_key(task))
                 .copied()
                 .collect();
             for task in tasks_gone {
                 // This task is gone, we remove it from the worker.
+                debug!(task_id=%task, worker_id=%worker.id, "Task is gone, remove from worker");
                 let resp = worker.client.remove_task(Context::current(), task).await;
                 check_resp(
                     resp,
@@ -174,6 +250,7 @@ impl WorkerGroupImpl {
             worker
                 .tasks
                 .lock()
+                .await
                 .retain(|task| self.tasks.contains_key(task));
         }
 
@@ -183,6 +260,8 @@ impl WorkerGroupImpl {
             let expected_worker_id = self.ring.get(&task_id);
             // Currently assigned worker.
             let bound_worker_id = &mut bound_task.workers;
+
+            debug!(%task_id, worker_id=%expected_worker_id, "Migrating task");
 
             if *bound_worker_id != Some(*expected_worker_id) {
                 // If task is not assigned to the expected worker ...
@@ -203,7 +282,7 @@ impl WorkerGroupImpl {
                     )?;
 
                     // Remove tasks from local map.
-                    old_worker.tasks.lock().remove(task_id);
+                    old_worker.tasks.lock().await.remove(task_id);
                 }
 
                 // Assign the task to the expected worker.
@@ -225,7 +304,7 @@ impl WorkerGroupImpl {
                 )?;
 
                 // Add tasks to local map.
-                expected_worker.tasks.lock().insert(*task_id);
+                expected_worker.tasks.lock().await.insert(*task_id);
 
                 // Update the task's bound info.
                 *bound_worker_id = Some(*expected_worker_id);
@@ -233,7 +312,7 @@ impl WorkerGroupImpl {
         }
 
         if cfg!(debug_assertions) {
-            self.validate();
+            self.validate().await;
         }
 
         Ok(())
@@ -245,11 +324,11 @@ impl WorkerGroupImpl {
     ///
     /// # Panics
     /// Panics if the group is not consistent.
-    pub fn validate(&self) {
+    pub async fn validate(&self) {
         // Task must only be assigned to one worker.
         let mut tasks = HashSet::new();
         for worker in self.workers.values() {
-            for task in &*worker.tasks.lock() {
+            for task in &*worker.tasks.lock().await {
                 assert!(tasks.insert(*task), "multiple task {} present", task);
             }
         }
@@ -320,7 +399,8 @@ pub struct Worker {
     /// RPC client to the worker.
     client: WorkerRpcClient,
     /// Watchdog task.
-    watchdog_job: JoinHandle<()>,
+    #[allow(dead_code)]
+    watchdog_job: ScopedJoinHandle<()>,
     /// Tasks assigned to the worker.
     tasks: Mutex<HashSet<Uuid>>,
 }
@@ -348,8 +428,8 @@ impl Worker {
 
                         if !matches!(resp, Ok(_tag)) {
                             // ping failed, remove node from worker group.
-                            error!("Worker {}: ping failed", this.id);
-                            this.remove_self();
+                            error!(worker_id = %this.id, "Ping failed");
+                            this.remove_self().await;
 
                             break;
                         }
@@ -365,21 +445,15 @@ impl Worker {
                 parent,
                 client: WorkerRpcClient::new(ClientConfig::default(), WsTransport::new(stream))
                     .spawn(),
-                watchdog_job,
+                watchdog_job: ScopedJoinHandle(watchdog_job),
                 tasks: Default::default(),
             }
         })
     }
     /// Remove self from worker group.
-    pub fn remove_self(&self) {
+    pub async fn remove_self(&self) {
         if let Some(parent) = self.parent.upgrade() {
-            parent.with(|parent| parent.remove_worker(self.id));
+            parent.with(|parent| parent.remove_worker(self.id)).await;
         }
-    }
-}
-
-impl Drop for Worker {
-    fn drop(&mut self) {
-        self.watchdog_job.abort();
     }
 }

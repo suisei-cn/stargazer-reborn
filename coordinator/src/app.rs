@@ -2,17 +2,20 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use eyre::Result;
-use parking_lot::Mutex;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http::{HeaderMap, StatusCode};
 use tracing::{debug, error, info};
 use uuid::Uuid;
+
+use sg_core::models::Task;
 
 use crate::config::Config;
 use crate::worker::{Worker, WorkerGroup};
@@ -46,8 +49,12 @@ impl App {
             }
         }
     }
-    #[must_use]
-    pub fn inner(&self) -> &AppImpl {
+}
+
+impl Deref for App {
+    type Target = AppImpl;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
@@ -93,6 +100,16 @@ impl AppImpl {
             ..Default::default()
         }
     }
+    /// Add a task to worker group of its kind.
+    pub async fn add_task(&self, task: Task) {
+        self.worker_groups
+            .lock()
+            .await
+            .entry(task.kind.clone())
+            .or_insert_with(WorkerGroup::new)
+            .with(|group| group.add_task(task))
+            .await;
+    }
     /// Accept a new worker.
     ///
     /// # Errors
@@ -123,12 +140,14 @@ impl AppImpl {
         debug!(worker_id = %worker_meta.id, "Worker accepted");
 
         // Spawn worker and add worker to a worker group.
-        let mut worker_groups = self.worker_groups.lock();
+        let mut worker_groups = self.worker_groups.lock().await;
         let worker_group = worker_groups
             .entry(worker_meta.kind)
             .or_insert_with(WorkerGroup::new);
         let worker = Worker::new(worker_meta.id, stream, worker_group.weak(), self.config);
-        worker_group.with(|worker_group| worker_group.add_worker(worker));
+        worker_group
+            .with(|worker_group| worker_group.add_worker(worker))
+            .await;
 
         Ok(())
     }

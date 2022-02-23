@@ -1,0 +1,16 @@
+[package]
+name = "dummy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sg-core = { package = "core", path = "../core" }
+tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
+tarpc = { version = "0.27", features = ["tokio1"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tokio-tungstenite = "0.17"
+eyre = "0.6"
+uuid = "0.8"
