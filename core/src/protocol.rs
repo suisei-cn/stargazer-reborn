@@ -54,9 +54,9 @@ where
             let mut req = addr.into_client_request()?;
 
             req.headers_mut()
-                .insert("sg-worker-ty", ty.to_string().parse()?);
+                .insert("Sg-Worker-Kind", ty.to_string().parse()?);
             req.headers_mut()
-                .insert("sg-worker-id", id.to_string().parse()?);
+                .insert("Sg-Worker-ID", id.to_string().parse()?);
 
             let (stream, _) = tokio_tungstenite::connect_async(req).await?;
             let channel = BaseChannel::with_defaults(WsTransport::new(stream));

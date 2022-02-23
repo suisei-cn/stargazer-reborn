@@ -28,8 +28,8 @@ pub struct Task {
     /// Task id. Used for scheduling.
     #[serde(with = "mongodb::bson::serde_helpers::uuid_as_binary")]
     pub id: Uuid,
-    /// Type of the task.
-    pub ty: String,
+    /// Kind of the task.
+    pub kind: String,
     /// Parameters of the task.
     pub params: Document,
 }

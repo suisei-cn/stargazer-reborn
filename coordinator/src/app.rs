@@ -55,13 +55,14 @@ impl App {
 /// Implementation of the application state.
 #[derive(Debug, Default)]
 pub struct AppImpl {
+    /// Worker groups.
     pub worker_groups: Mutex<HashMap<String, WorkerGroup>>,
     config: Config,
 }
 
 struct WorkerMeta {
     id: Uuid,
-    ty: String,
+    kind: String,
 }
 
 impl TryFrom<&HeaderMap> for WorkerMeta {
@@ -70,16 +71,16 @@ impl TryFrom<&HeaderMap> for WorkerMeta {
     fn try_from(headers: &HeaderMap) -> StdResult<Self, Box<dyn Error>> {
         let id = Uuid::from_str(
             headers
-                .get("sg-worker-id")
-                .ok_or("missing header: sg-worker-id")?
+                .get("Sg-Worker-ID")
+                .ok_or("missing header: Sg-Worker-ID")?
                 .to_str()?,
         )?;
-        let ty = headers
-            .get("sg-worker-ty")
-            .ok_or("missing header: sg-worker-ty")?
+        let kind = headers
+            .get("Sg-Worker-Kind")
+            .ok_or("missing header: Sg-Worker-Kind")?
             .to_str()?
             .to_string();
-        Ok(Self { id, ty })
+        Ok(Self { id, kind })
     }
 }
 
@@ -124,7 +125,7 @@ impl AppImpl {
         // Spawn worker and add worker to a worker group.
         let mut worker_groups = self.worker_groups.lock();
         let worker_group = worker_groups
-            .entry(worker_meta.ty)
+            .entry(worker_meta.kind)
             .or_insert_with(WorkerGroup::new);
         let worker = Worker::new(worker_meta.id, stream, worker_group.weak(), self.config);
         worker_group.with(|worker_group| worker_group.add_worker(worker));
