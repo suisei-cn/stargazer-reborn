@@ -5,8 +5,8 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum TransportError {
     /// Bincode can't (de)serialize the message.
-    #[error("Bincode error")]
-    Serialize(#[from] bincode::Error),
+    #[error("Json error: {0}")]
+    Serialize(#[from] serde_json::Error),
     /// An error occurred on the websocket stream.
     #[error("Websocket error")]
     Websocket(#[from] tokio_tungstenite::tungstenite::Error),
