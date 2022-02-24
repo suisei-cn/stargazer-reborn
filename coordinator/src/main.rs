@@ -4,9 +4,6 @@
 
 use eyre::Result;
 use tracing::level_filters::LevelFilter;
-use uuid::Uuid;
-
-use sg_core::models::Task;
 
 use crate::app::App;
 use crate::config::Config;
@@ -26,16 +23,6 @@ async fn main() -> Result<()> {
         .with_max_level(LevelFilter::DEBUG)
         .init();
     let app = App::new(Config::from_env()?);
-
-    // TODO debug code
-    for _ in 0..20 {
-        app.add_task(Task {
-            id: Uuid::new_v4(),
-            kind: "dummy".to_string(),
-            params: Default::default(),
-        })
-        .await;
-    }
 
     app.serve().await?;
     Ok(())
