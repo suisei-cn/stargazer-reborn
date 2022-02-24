@@ -1,2 +1,2 @@
 [workspace]
-members = ["coordinator", "core", "dummy"]
+members = ["coordinator", "core"]
