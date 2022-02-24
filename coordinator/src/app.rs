@@ -1,7 +1,6 @@
 //! Application state.
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::Display;
 use std::ops::Deref;
 use std::result::Result as StdResult;
 use std::str::FromStr;
@@ -21,7 +20,7 @@ use crate::config::Config;
 use crate::worker::{Worker, WorkerGroup};
 
 /// The application state.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct App(Arc<AppImpl>);
 
 impl App {
@@ -34,11 +33,10 @@ impl App {
     ///
     /// # Errors
     /// Return error if failed to bind to the given address.
-    pub async fn serve(self, addr: impl Display + Send) -> Result<()> {
-        let addr = addr.to_string();
-        info!("Listening on {}", addr);
+    pub async fn serve(self) -> Result<()> {
+        info!("Listening on {}", self.config.bind);
 
-        let socket = TcpListener::bind(addr).await?;
+        let socket = TcpListener::bind(self.config.bind).await?;
         loop {
             if let Ok((socket, addr)) = socket.accept().await {
                 info!(addr = %addr, "Accepting connection");
@@ -62,7 +60,7 @@ impl Deref for App {
 }
 
 /// Implementation of the application state.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AppImpl {
     /// Worker groups.
     pub worker_groups: Mutex<HashMap<String, WorkerGroup>>,
@@ -98,8 +96,8 @@ impl AppImpl {
     #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
+            worker_groups: Default::default(),
             config,
-            ..Default::default()
         }
     }
     /// Add a task to worker group of its kind.

@@ -9,6 +9,7 @@ use uuid::Uuid;
 use sg_core::models::Task;
 
 use crate::app::App;
+use crate::config::Config;
 
 pub mod app;
 pub mod config;
@@ -24,7 +25,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::DEBUG)
         .init();
-    let app = App::default();
+    let app = App::new(Config::from_env()?);
 
     // TODO debug code
     for _ in 0..20 {
@@ -36,6 +37,6 @@ async fn main() -> Result<()> {
         .await;
     }
 
-    app.serve("127.0.0.1:7000").await?;
+    app.serve().await?;
     Ok(())
 }

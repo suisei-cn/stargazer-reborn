@@ -80,6 +80,7 @@ impl Tester {
     pub async fn new() -> Self {
         let port = free_port();
         let server = App::new(Config {
+            bind: format!("127.0.0.1:{}", port).parse().unwrap(),
             ping_interval: Duration::from_millis(100),
         });
         let (tx, rx) = channel();
@@ -87,7 +88,7 @@ impl Tester {
             let server = server.clone();
             tokio::spawn(async move {
                 tokio::select! {
-                    r = server.serve(format!("127.0.0.1:{}", port)) => r,
+                    r = server.serve() => r,
                     _ = rx => Ok(())
                 }
             })
