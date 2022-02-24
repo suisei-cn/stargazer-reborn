@@ -10,12 +10,19 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use uuid::Uuid;
 
 use crate::adapter::WsTransport;
+use crate::models::Task;
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]
 pub trait WorkerRpc {
     /// Ping the worker.
     async fn ping(id: u64) -> u64;
+    /// Add a task to the worker. Return `false` if the task already exists.
+    async fn add_task(task: Task) -> bool;
+    /// Remove a task from the worker. Return `false` if the task was not found.
+    async fn remove_task(id: Uuid) -> bool;
+    /// Get the list of tasks running on the worker.
+    async fn tasks() -> Vec<Task>;
 }
 
 /// Extension trait for `WorkerRpc`.
@@ -23,15 +30,15 @@ pub trait WorkerRpcExt {
     /// Join a coordinator.
     fn join(
         self,
-        addr: impl IntoClientRequest + Unpin + 'static,
+        addr: impl IntoClientRequest + Unpin + Send + 'static,
         id: Uuid,
-        ty: impl Display + 'static,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+        ty: impl Display + Send + 'static,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 }
 
 impl<T> WorkerRpcExt for T
 where
-    T: WorkerRpc + Clone,
+    T: WorkerRpc + Clone + Send,
     ServeWorkerRpc<T>: Serve<WorkerRpcRequest, Resp = WorkerRpcResponse, Fut = WorkerRpcResponseFut<Self>>
         + Send
         + 'static,
@@ -39,17 +46,17 @@ where
 {
     fn join(
         self,
-        addr: impl IntoClientRequest + Unpin + 'static,
+        addr: impl IntoClientRequest + Unpin + Send + 'static,
         id: Uuid,
-        ty: impl Display + 'static,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        ty: impl Display + Send + 'static,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
         Box::pin(async move {
             let mut req = addr.into_client_request()?;
 
             req.headers_mut()
-                .insert("sg-worker-ty", ty.to_string().parse()?);
+                .insert("Sg-Worker-Kind", ty.to_string().parse()?);
             req.headers_mut()
-                .insert("sg-worker-id", id.to_string().parse()?);
+                .insert("Sg-Worker-ID", id.to_string().parse()?);
 
             let (stream, _) = tokio_tungstenite::connect_async(req).await?;
             let channel = BaseChannel::with_defaults(WsTransport::new(stream));

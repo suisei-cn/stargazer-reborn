@@ -32,7 +32,7 @@ where
         Poll::Ready(match ready!(self.0.poll_next_unpin(cx)) {
             Some(Ok(e)) => {
                 if let Message::Binary(data) = e {
-                    Some(Ok(bincode::deserialize(&data)?))
+                    Some(Ok(serde_json::from_slice(&data)?))
                 } else {
                     return Poll::Pending;
                 }
@@ -56,7 +56,7 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: SinkItem) -> Result<(), Self::Error> {
-        let item = bincode::serialize(&item)?;
+        let item = serde_json::to_vec(&item)?;
         Ok(self.0.start_send_unpin(Message::Binary(item))?)
     }
 
