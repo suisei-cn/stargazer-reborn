@@ -25,3 +25,4 @@ uuid = "0.8"
 
 [dev-dependencies]
 figment = { version = "0.10", features = ["test"] }
+educe = "0.4"

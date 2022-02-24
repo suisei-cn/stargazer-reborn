@@ -1,7 +1,7 @@
 //! Application state.
 use std::collections::HashMap;
 use std::error::Error;
-use std::net::SocketAddr;
+use std::fmt::Display;
 use std::ops::Deref;
 use std::result::Result as StdResult;
 use std::str::FromStr;
@@ -34,9 +34,11 @@ impl App {
     ///
     /// # Errors
     /// Return error if failed to bind to the given address.
-    pub async fn serve(&self, addr: SocketAddr) -> Result<()> {
-        let socket = TcpListener::bind(&addr).await?;
+    pub async fn serve(self, addr: impl Display + Send) -> Result<()> {
+        let addr = addr.to_string();
         info!("Listening on {}", addr);
+
+        let socket = TcpListener::bind(addr).await?;
         loop {
             if let Ok((socket, addr)) = socket.accept().await {
                 info!(addr = %addr, "Accepting connection");
@@ -109,6 +111,12 @@ impl AppImpl {
             .or_insert_with(WorkerGroup::new)
             .with(|group| group.add_task(task))
             .await;
+    }
+    /// Remove a task from worker groups.
+    pub async fn remove_task(&self, id: Uuid) {
+        for group in self.worker_groups.lock().await.values_mut() {
+            group.with(|group| group.remove_task(id)).await;
+        }
     }
     /// Accept a new worker.
     ///

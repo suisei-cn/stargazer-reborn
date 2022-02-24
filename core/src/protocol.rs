@@ -30,15 +30,15 @@ pub trait WorkerRpcExt {
     /// Join a coordinator.
     fn join(
         self,
-        addr: impl IntoClientRequest + Unpin + 'static,
+        addr: impl IntoClientRequest + Unpin + Send + 'static,
         id: Uuid,
-        ty: impl Display + 'static,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>>;
+        ty: impl Display + Send + 'static,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 }
 
 impl<T> WorkerRpcExt for T
 where
-    T: WorkerRpc + Clone,
+    T: WorkerRpc + Clone + Send,
     ServeWorkerRpc<T>: Serve<WorkerRpcRequest, Resp = WorkerRpcResponse, Fut = WorkerRpcResponseFut<Self>>
         + Send
         + 'static,
@@ -46,10 +46,10 @@ where
 {
     fn join(
         self,
-        addr: impl IntoClientRequest + Unpin + 'static,
+        addr: impl IntoClientRequest + Unpin + Send + 'static,
         id: Uuid,
-        ty: impl Display + 'static,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+        ty: impl Display + Send + 'static,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
         Box::pin(async move {
             let mut req = addr.into_client_request()?;
 

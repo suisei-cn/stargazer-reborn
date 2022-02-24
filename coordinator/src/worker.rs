@@ -67,7 +67,7 @@ impl WorkerGroup {
         }
     }
     /// Lock the worker group and mutate its state.
-    pub async fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O) -> O {
+    pub async fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O + Send) -> O {
         let mut lock = self.inner.lock().await;
         let output = f(&mut *lock);
         drop(lock);
@@ -94,17 +94,17 @@ impl WeakWorkerGroup {
 }
 
 #[derive(Debug)]
-struct BoundTask {
+pub(crate) struct BoundTask {
     /// Task struct.
     task: Task,
     /// The worker that is currently executing the task.
-    workers: Option<Uuid>,
+    pub(crate) worker: Option<Uuid>,
 }
 
 /// Worker group implementation.
 pub struct WorkerGroupImpl {
-    workers: HashMap<Uuid, Arc<Worker>>,
-    tasks: HashMap<Uuid, BoundTask>,
+    pub(crate) workers: HashMap<Uuid, Arc<Worker>>,
+    pub(crate) tasks: HashMap<Uuid, BoundTask>,
     ring: Ring</* worker */ Uuid>,
     balance_notify: Arc<Notify>,
 }
@@ -176,10 +176,7 @@ impl WorkerGroupImpl {
     pub fn add_task(&mut self, task: Task) {
         let id = task.id;
         debug!(task_id = %id, "Add task to group");
-        let bound_task = BoundTask {
-            task,
-            workers: None,
-        };
+        let bound_task = BoundTask { task, worker: None };
         self.tasks.insert(id, bound_task);
 
         self.balance_notify.notify_one();
@@ -259,7 +256,7 @@ impl WorkerGroupImpl {
             // Calculate expected worker using the ring.
             let expected_worker_id = self.ring.get(&task_id);
             // Currently assigned worker.
-            let bound_worker_id = &mut bound_task.workers;
+            let bound_worker_id = &mut bound_task.worker;
 
             debug!(%task_id, worker_id=%expected_worker_id, "Migrating task");
 
@@ -342,11 +339,7 @@ impl WorkerGroupImpl {
 
         // Task can't be assigned to unknown workers.
         let workers: HashSet<_> = self.workers.keys().copied().collect();
-        let assigned_to: HashSet<_> = self
-            .tasks
-            .values()
-            .filter_map(|task| task.workers)
-            .collect();
+        let assigned_to: HashSet<_> = self.tasks.values().filter_map(|task| task.worker).collect();
         let unknown_workers = &assigned_to - &workers;
         assert!(
             unknown_workers.is_empty(),

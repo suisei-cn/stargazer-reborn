@@ -2,9 +2,6 @@
 #![allow(clippy::module_name_repetitions, clippy::default_trait_access)]
 #![deny(missing_docs)]
 
-use std::net::SocketAddr;
-use std::str::FromStr;
-
 use eyre::Result;
 use tracing::level_filters::LevelFilter;
 use uuid::Uuid;
@@ -39,7 +36,6 @@ async fn main() -> Result<()> {
         .await;
     }
 
-    app.serve(SocketAddr::from_str("127.0.0.1:7000").unwrap())
-        .await?;
+    app.serve("127.0.0.1:7000").await?;
     Ok(())
 }
