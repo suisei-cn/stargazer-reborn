@@ -51,7 +51,11 @@ impl WorkerRpc for DummyWorker {
         id
     }
     async fn add_task(self, _: Context, task: Task) -> bool {
-        self.tasks.lock().unwrap().insert(task.id, task).is_none()
+        self.tasks
+            .lock()
+            .unwrap()
+            .insert(task.id.into(), task)
+            .is_none()
     }
     async fn remove_task(self, _: Context, id: Uuid) -> bool {
         self.tasks.lock().unwrap().remove(&id).is_some()
@@ -141,7 +145,7 @@ impl Tester {
                     client_side
                         .entry(kind.clone())
                         .or_default()
-                        .insert(task.id, worker.id);
+                        .insert(task.id.into(), worker.id);
                 }
             }
         }
@@ -203,12 +207,15 @@ impl Tester {
 
         for _ in 0..count {
             let task = Task {
-                id: Uuid::new_v4(),
+                id: Uuid::new_v4().into(),
                 kind: kind.clone(),
                 params: Default::default(),
             };
 
-            self.tasks.entry(kind.clone()).or_default().insert(task.id);
+            self.tasks
+                .entry(kind.clone())
+                .or_default()
+                .insert(task.id.into());
             self.server.add_task(task).await;
         }
 

@@ -177,7 +177,7 @@ impl WorkerGroupImpl {
         let id = task.id;
         debug!(task_id = %id, "Add task to group");
         let bound_task = BoundTask { task, worker: None };
-        self.tasks.insert(id, bound_task);
+        self.tasks.insert(id.into(), bound_task);
 
         self.balance_notify.notify_one();
     }
