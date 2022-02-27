@@ -1,4 +1,6 @@
 //! Models for the entity collection.
+use std::collections::HashMap;
+
 use mongodb::bson::Document;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -18,8 +20,12 @@ pub struct Entity {
 /// Meta of the vtuber.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
-    /// Vtuber canonical name.
-    pub name: String,
+    /// Vtuber's name in different languages. The key must be in ISO 639-1.
+    pub name: HashMap<String, String>,
+    /// Preferred language of the vtuber. Must be in ISO 639-1.
+    pub default_language: String,
+    /// Affiliation of the vtuber.
+    pub group: Option<String>,
 }
 
 /// Defined task for a vtuber.
