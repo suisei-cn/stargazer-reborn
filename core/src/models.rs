@@ -29,8 +29,10 @@ pub struct Meta {
 /// Defined task for a vtuber.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
-    /// Task id. Used for scheduling.
+    /// The unique identifier of the task.
     pub id: Uuid,
+    /// Parent entity id.
+    pub entity: Uuid,
     /// Kind of the task.
     pub kind: String,
     /// Parameters of the task.
