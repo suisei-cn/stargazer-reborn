@@ -1,5 +1,5 @@
 //! Models for the entity collection.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use mongodb::bson::{Document, Uuid};
 use serde::{Deserialize, Serialize};
@@ -37,4 +37,38 @@ pub struct Task {
     pub kind: String,
     /// Parameters of the task.
     pub params: Document,
+}
+
+/// Event pushed by workers (or addons) to the message queue and received by IM agents.
+pub struct Event {
+    /// The unique identifier of the event.
+    pub id: Uuid,
+    /// Kind of the event.
+    pub kind: String,
+    /// Entity affected by the event.
+    pub entity: Uuid,
+    /// Fields of the event.
+    pub fields: Document,
+}
+
+/// IM subscriber.
+pub struct User {
+    /// The unique identifier of the user. The same physical user in different IMs should have different id.
+    pub id: Uuid,
+    /// The IM that the user is in.
+    pub im: String,
+    /// Name of the user.
+    pub name: String,
+    /// Avatar of the user.
+    pub avatar: Vec<u8>,
+    /// The events that the user is subscribed to.
+    pub event_filter: EventFilter,
+}
+
+/// Filter for events.
+pub struct EventFilter {
+    /// Event must be related to these entities.
+    pub entities: HashSet<Uuid>,
+    /// Event must be in these kinds.
+    pub kinds: HashSet<String>,
 }
