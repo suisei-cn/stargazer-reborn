@@ -208,6 +208,7 @@ impl Tester {
         for _ in 0..count {
             let task = Task {
                 id: Uuid::new_v4().into(),
+                entity: Uuid::new_v4().into(),
                 kind: kind.clone(),
                 params: Default::default(),
             };
