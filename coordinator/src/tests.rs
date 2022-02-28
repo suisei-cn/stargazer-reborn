@@ -6,6 +6,8 @@ use std::time::Duration;
 
 use educe::Educe;
 use eyre::Result;
+use mongodb::bson::doc;
+use mongodb::{Client, Collection};
 use tarpc::context::Context;
 use tokio::sync::oneshot::{channel, Sender};
 use tokio::task::JoinHandle;
@@ -14,8 +16,10 @@ use uuid::Uuid;
 
 use sg_core::models::Task;
 use sg_core::protocol::{WorkerRpc, WorkerRpcExt};
+use sg_core::value::Value;
 
 use crate::config::Config;
+use crate::db::DB;
 use crate::utils::ScopedJoinHandle;
 use crate::App;
 
@@ -259,4 +263,107 @@ async fn must_consistent() {
     tester.increase_tasks("test", 50).await;
 
     tester.finish().await;
+}
+
+#[tokio::test]
+async fn must_db() {
+    let client = Client::with_uri_str("mongodb://localhost:27017/")
+        .await
+        .unwrap();
+    let db = client.database("test");
+    let collection: Collection<Task> = db.collection("coordinator");
+    let config = Config {
+        mongo_uri: String::from("mongodb://localhost:27017/"),
+        mongo_db: String::from("test"),
+        mongo_collection: String::from("coordinator"),
+        ..Default::default()
+    };
+
+    // Clear test collection before test.
+    collection.drop(None).await.unwrap();
+
+    // Add some initial tasks.
+    let mut tasks: Vec<_> = (0..5)
+        .into_iter()
+        .map(|_| Task {
+            id: Uuid::new_v4().into(),
+            entity: Uuid::new_v4().into(),
+            kind: String::from("test"),
+            params: Default::default(),
+        })
+        .collect();
+    collection.insert_many(&tasks, None).await.unwrap();
+
+    // Create app and db instance.
+    let app = App::new(config.clone());
+    let mut db = DB::new(app.clone(), config).await.unwrap();
+
+    // Initial tasks must be added.
+    db.init_tasks().await.unwrap();
+    assert_task_ids(&app, &tasks).await;
+
+    // Spawn change stream task.
+    tokio::spawn(async move {
+        db.watch_tasks().await.unwrap();
+    });
+
+    let new_task = Task {
+        id: Uuid::new_v4().into(),
+        entity: Uuid::new_v4().into(),
+        kind: String::from("test"),
+        params: Default::default(),
+    };
+
+    // Insert a new task.
+    tasks.push(new_task.clone());
+    collection.insert_one(new_task, None).await.unwrap();
+    sleep(Duration::from_millis(200)).await;
+    assert_task_ids(&app, &tasks).await;
+
+    // Update a task.
+    let mut task = tasks.pop().unwrap();
+    task.params
+        .insert("test".into(), Value::String("test".into()));
+    tasks.push(task.clone());
+    collection
+        .update_one(
+            doc! { "id": task.id },
+            doc! { "$set": { "params": { "test": "test" } } },
+            None,
+        )
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(200)).await;
+    assert_task_ids(&app, &tasks).await;
+
+    // Replace a task.
+    let mut task = tasks.pop().unwrap();
+    task.params.clear();
+    tasks.push(task.clone());
+    collection
+        .replace_one(doc! { "id": task.id }, task, None)
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(200)).await;
+    assert_task_ids(&app, &tasks).await;
+
+    // Delete a task.
+    let task = tasks.pop().unwrap();
+    collection
+        .delete_one(doc! { "id": task.id }, None)
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(200)).await;
+    assert_task_ids(&app, &tasks).await;
+}
+
+async fn assert_task_ids(app: &App, expected: &[Task]) {
+    app.worker_groups.lock().await["test"]
+        .with(|group| {
+            let group_task_ids: HashSet<_> = group.tasks.keys().copied().collect();
+            let expected_task_ids: HashSet<_> =
+                expected.iter().map(|task| task.id.into()).collect();
+            assert_eq!(group_task_ids, expected_task_ids);
+        })
+        .await;
 }

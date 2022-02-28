@@ -7,9 +7,11 @@ use tracing::level_filters::LevelFilter;
 
 use crate::app::App;
 use crate::config::Config;
+use crate::db::DB;
 
 pub mod app;
 pub mod config;
+pub mod db;
 pub mod utils;
 pub mod worker;
 
@@ -22,8 +24,18 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::DEBUG)
         .init();
-    let app = App::new(Config::from_env()?);
 
-    app.serve().await?;
+    let config = Config::from_env()?;
+
+    let app = App::new(config.clone());
+    let mut db = DB::new(app.clone(), config).await?;
+
+    db.init_tasks().await?;
+
+    tokio::select! {
+        r = app.serve() => r?,
+        r = db.watch_tasks() => r?,
+    };
+
     Ok(())
 }
