@@ -1,8 +1,10 @@
 //! Models for the entity collection.
 use std::collections::{HashMap, HashSet};
 
-use mongodb::bson::{Document, Uuid};
+use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
+
+use crate::value::Map;
 
 /// Entity for a vtuber.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ pub struct Task {
     /// Kind of the task.
     pub kind: String,
     /// Parameters of the task.
-    pub params: Document,
+    pub params: Map,
 }
 
 /// Event pushed by workers (or addons) to the message queue and received by IM agents.
@@ -48,7 +50,7 @@ pub struct Event {
     /// Entity affected by the event.
     pub entity: Uuid,
     /// Fields of the event.
-    pub fields: Document,
+    pub fields: Map,
 }
 
 /// IM subscriber.
