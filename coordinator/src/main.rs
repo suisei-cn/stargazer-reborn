@@ -12,7 +12,6 @@ use crate::db::DB;
 pub mod app;
 pub mod config;
 pub mod db;
-pub mod utils;
 pub mod worker;
 
 #[cfg(test)]

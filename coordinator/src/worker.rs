@@ -17,9 +17,9 @@ use uuid::Uuid;
 use sg_core::adapter::WsTransport;
 use sg_core::models::Task;
 use sg_core::protocol::WorkerRpcClient;
+use sg_core::utils::ScopedJoinHandle;
 
 use crate::config::Config;
-use crate::utils::ScopedJoinHandle;
 
 /// Worker group for homogeneous workers.
 #[derive(Debug)]
