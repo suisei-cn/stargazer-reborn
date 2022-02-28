@@ -1,7 +1,9 @@
 //! Models for the entity collection.
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 
 use isolanguage_1::LanguageCode;
+use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -74,4 +76,39 @@ pub struct EventFilter {
     pub entities: HashSet<Uuid>,
     /// Event must be in these kinds.
     pub kinds: HashSet<String>,
+}
+
+/// Wrapper for model providing `MongoDB` `ObjectId`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InDB<T> {
+    #[serde(rename = "_id")]
+    id: ObjectId,
+    #[serde(flatten)]
+    inner: T,
+}
+
+impl<T> InDB<T> {
+    /// Get the `ObjectId`.
+    pub const fn id(&self) -> ObjectId {
+        self.id
+    }
+    /// Get the inner body.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> Deref for InDB<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for InDB<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
