@@ -16,11 +16,11 @@ use uuid::Uuid;
 
 use sg_core::models::Task;
 use sg_core::protocol::{WorkerRpc, WorkerRpcExt};
+use sg_core::utils::ScopedJoinHandle;
 use sg_core::value::Value;
 
 use crate::config::Config;
 use crate::db::DB;
-use crate::utils::ScopedJoinHandle;
 use crate::App;
 
 #[derive(Clone, Educe)]
