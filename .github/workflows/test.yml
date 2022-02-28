@@ -37,6 +37,10 @@ jobs:
       - run: rustup show
         name: Setup Cargo Toolchain 🛎️
       - uses: Swatinem/rust-cache@v1
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.7.0
+        with:
+          mongodb-replica-set: rs0
       - uses: actions-rs/cargo@v1
         name: Running Tests 🚀
         with:
