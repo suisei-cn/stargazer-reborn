@@ -1,6 +1,7 @@
 //! Models for the entity collection.
 use std::collections::{HashMap, HashSet};
 
+use isolanguage_1::LanguageCode;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -21,9 +22,9 @@ pub struct Entity {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
     /// Vtuber's name in different languages. The key must be in ISO 639-1.
-    pub name: HashMap<String, String>,
+    pub name: HashMap<LanguageCode, String>,
     /// Preferred language of the vtuber. Must be in ISO 639-1.
-    pub default_language: String,
+    pub default_language: LanguageCode,
     /// Affiliation of the vtuber.
     pub group: Option<String>,
 }
