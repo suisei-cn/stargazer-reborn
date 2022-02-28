@@ -400,7 +400,7 @@ pub struct Worker {
 
 impl Worker {
     /// Create a new worker from given stream and worker group.
-    pub fn new<S>(id: Uuid, stream: S, parent: WeakWorkerGroup, config: Config) -> Arc<Self>
+    pub fn new<S>(id: Uuid, stream: S, parent: WeakWorkerGroup, config: &Config) -> Arc<Self>
     where
         S: Stream<Item = Result<Message, WsError>>
             + Sink<Message, Error = WsError>
@@ -410,8 +410,9 @@ impl Worker {
     {
         Arc::new_cyclic(|this: &Weak<Self>| {
             let this = this.clone();
+            let ping_interval = config.ping_interval;
             let watchdog_job = tokio::spawn(async move {
-                let mut check_interval = tokio::time::interval(config.ping_interval);
+                let mut check_interval = tokio::time::interval(ping_interval);
                 loop {
                     check_interval.tick().await;
 
