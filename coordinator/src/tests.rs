@@ -86,6 +86,7 @@ impl Tester {
         let server = App::new(Config {
             bind: format!("127.0.0.1:{}", port).parse().unwrap(),
             ping_interval: Duration::from_millis(100),
+            ..Default::default()
         });
         let (tx, rx) = channel();
         let server_handle = {
