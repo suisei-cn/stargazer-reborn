@@ -31,6 +31,7 @@ impl<T> Drop for ScopedJoinHandle<T> {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+    use tokio::task::yield_now;
 
     use tokio::time::sleep;
 
@@ -48,7 +49,12 @@ mod tests {
                 sleep(Duration::from_secs(99999)).await;
             }
         }));
+
+        // Drop the handle to abort the task.
         drop(handle);
+
+        // Yield to the runtime to let the task abort.
+        yield_now().await;
 
         // The task should be aborted, and the channel should be closed.
         assert!(tx.is_closed());
