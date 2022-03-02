@@ -30,6 +30,6 @@ command = ["cargo", "doc", "--color", "always", "--no-deps"]
 need_stdout = false
 
 [jobs.fix]
-command = ["cargo", "clippy", "--fix", "--allow-dirty", "--workspace", "--tests", "--color", "always", "--", "-W", "clippy::all", "-W", "clippy::nursery", "-W", "clippy::pedantic"]
+command = ["cargo", "clippy", "--fix", "--allow-staged", "--allow-dirty", "--workspace", "--tests", "--color", "always", "--", "-W", "clippy::all", "-W", "clippy::nursery", "-W", "clippy::pedantic"]
 need_stdout = false
 on_success = "job:clippy"
