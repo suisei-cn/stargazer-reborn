@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::adapter::WsTransport;
 use crate::models::Task;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]
