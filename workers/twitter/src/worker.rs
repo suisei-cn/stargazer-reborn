@@ -41,13 +41,13 @@ impl TwitterWorker {
 }
 
 async fn twitter_task(
-    twitter_id: u64,
+    user_id: UserID,
     token: &Token,
     entity_id: Uuid,
     mq: &MessageQueue,
 ) -> Result<()> {
     let mut stream =
-        TimelineStream::new(user_timeline(UserID::ID(twitter_id), false, true, token)).await?;
+        TimelineStream::new(user_timeline(user_id, false, true, token)).await?;
     while let Some(resp) = stream.next().await {
         for raw_tweet in resp?.response {
             let tweet = Tweet::from(raw_tweet);
@@ -76,11 +76,17 @@ impl WorkerRpc for TwitterWorker {
         info!(task_id = ?task.id, "Adding task");
 
         // Extract the twitter id from the task.
-        let id = if let Some(id) = task.params.get("id").and_then(Value::as_u64) {
-            id
-        } else {
-            error!("Missing id in task params.");
-            return false;
+        let id = match task.params.get("id") {
+            Some(Value::Number(id)) if id.is_u64() => UserID::ID(id.as_u64().unwrap()),
+            Some(Value::String(screen_name)) => UserID::from(screen_name.to_string()),
+            Some(_) => {
+                error!("ID field: type mismatch. Expected: u64 or String");
+                return false;
+            }
+            None => {
+                error!("ID field: missing");
+                return false;
+            }
         };
 
         let token = self.token.clone();
@@ -88,7 +94,7 @@ impl WorkerRpc for TwitterWorker {
         // Prepare the worker future.
         let fut = async move {
             loop {
-                if let Err(error) = twitter_task(id, &token, task.entity.into(), &*self.mq).await {
+                if let Err(error) = twitter_task(id.clone(), &token, task.entity.into(), &*self.mq).await {
                     error!(?error, "Failed to fetch timeline");
                 }
             }
