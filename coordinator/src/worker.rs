@@ -267,7 +267,9 @@ impl WorkerGroupImpl {
                     // If task is not assigned to the expected worker ...
 
                     // If the task has already assigned to a worker, remove it.
-                    if let Some(old_worker) = bound_worker_id.and_then(|id| self.workers.get_mut(&id)) {
+                    if let Some(old_worker) =
+                        bound_worker_id.and_then(|id| self.workers.get_mut(&id))
+                    {
                         // Do RPC to remove tasks from remote worker.
                         let resp = old_worker
                             .client
