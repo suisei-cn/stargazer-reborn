@@ -7,11 +7,11 @@ use std::pin::Pin;
 use eyre::Result;
 use tarpc::server::{BaseChannel, Channel, Serve};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::adapter::WsTransport;
 use crate::models::Task;
-use tracing::{debug, info};
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]

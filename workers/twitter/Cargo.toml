@@ -24,7 +24,7 @@ tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", 
 tokio-executor-trait = "2.1"
 tokio-reactor-trait = "1.1"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features=["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = "0.8"
 
 [dev-dependencies]
