@@ -212,11 +212,6 @@ impl WorkerGroupImpl {
     async fn balance_impl(&mut self) -> Result<(), Uuid> {
         // TODO instrument this future
 
-        if self.ring.is_empty() {
-            error!("Balance: No worker in worker group");
-            return Ok(());
-        }
-
         // Remove gone tasks.
         for worker in self.workers.values_mut() {
             // Note that we collect tasks_gone first to avoid holding the lock across awaits.
@@ -251,60 +246,69 @@ impl WorkerGroupImpl {
                 .retain(|task| self.tasks.contains_key(task));
         }
 
-        // Migrate tasks to new workers.
-        for (task_id, bound_task) in &mut self.tasks {
-            // Calculate expected worker using the ring.
-            let expected_worker_id = self.ring.get(&task_id);
-            // Currently assigned worker.
-            let bound_worker_id = &mut bound_task.worker;
+        if self.ring.is_empty() {
+            error!("Balance: No worker in worker group");
 
-            debug!(%task_id, worker_id=%expected_worker_id, "Migrating task");
+            // All tasks are orphaned.
+            for bound_task in self.tasks.values_mut() {
+                bound_task.worker = None;
+            }
+        } else {
+            // Migrate tasks to new workers.
+            for (task_id, bound_task) in &mut self.tasks {
+                // Calculate expected worker using the ring.
+                let expected_worker_id = self.ring.get(&task_id);
+                // Currently assigned worker.
+                let bound_worker_id = &mut bound_task.worker;
 
-            if *bound_worker_id != Some(*expected_worker_id) {
-                // If task is not assigned to the expected worker ...
+                debug!(%task_id, worker_id=%expected_worker_id, "Migrating task");
 
-                // If the task has already assigned to a worker, remove it.
-                if let Some(old_worker) = bound_worker_id.and_then(|id| self.workers.get_mut(&id)) {
-                    // Do RPC to remove tasks from remote worker.
-                    let resp = old_worker
+                if *bound_worker_id != Some(*expected_worker_id) {
+                    // If task is not assigned to the expected worker ...
+
+                    // If the task has already assigned to a worker, remove it.
+                    if let Some(old_worker) = bound_worker_id.and_then(|id| self.workers.get_mut(&id)) {
+                        // Do RPC to remove tasks from remote worker.
+                        let resp = old_worker
+                            .client
+                            .remove_task(Context::current(), *task_id)
+                            .await;
+                        check_resp(
+                            resp,
+                            *task_id,
+                            old_worker.id,
+                            "Task not found on worker",
+                            "Error removing task from worker",
+                        )?;
+
+                        // Remove tasks from local map.
+                        old_worker.tasks.lock().await.remove(task_id);
+                    }
+
+                    // Assign the task to the expected worker.
+                    let expected_worker = self
+                        .workers
+                        .get_mut(expected_worker_id)
+                        .expect("Migration target worker must exist");
+                    // Do RPC to add tasks to remote worker.
+                    let resp = expected_worker
                         .client
-                        .remove_task(Context::current(), *task_id)
+                        .add_task(Context::current(), bound_task.task.clone())
                         .await;
                     check_resp(
                         resp,
                         *task_id,
-                        old_worker.id,
-                        "Task not found on worker",
-                        "Error removing task from worker",
+                        *expected_worker_id,
+                        "Task already exists on worker",
+                        "Error adding task to worker",
                     )?;
 
-                    // Remove tasks from local map.
-                    old_worker.tasks.lock().await.remove(task_id);
+                    // Add tasks to local map.
+                    expected_worker.tasks.lock().await.insert(*task_id);
+
+                    // Update the task's bound info.
+                    *bound_worker_id = Some(*expected_worker_id);
                 }
-
-                // Assign the task to the expected worker.
-                let expected_worker = self
-                    .workers
-                    .get_mut(expected_worker_id)
-                    .expect("Migration target worker must exist");
-                // Do RPC to add tasks to remote worker.
-                let resp = expected_worker
-                    .client
-                    .add_task(Context::current(), bound_task.task.clone())
-                    .await;
-                check_resp(
-                    resp,
-                    *task_id,
-                    *expected_worker_id,
-                    "Task already exists on worker",
-                    "Error adding task to worker",
-                )?;
-
-                // Add tasks to local map.
-                expected_worker.tasks.lock().await.insert(*task_id);
-
-                // Update the task's bound info.
-                *bound_worker_id = Some(*expected_worker_id);
             }
         }
 

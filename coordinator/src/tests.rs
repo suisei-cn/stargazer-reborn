@@ -265,6 +265,18 @@ async fn must_consistent() {
 }
 
 #[tokio::test]
+async fn must_consistent_after_empty_group() {
+    let mut tester = Tester::new().await;
+
+    tester.increase_tasks("test", 10).await;
+    tester.increase_workers("test", 1).await;
+    tester.decrease_workers("test", 1).await;
+    tester.increase_workers("test", 1).await;
+
+    tester.finish().await;
+}
+
+#[tokio::test]
 async fn must_db() {
     let client = Client::with_uri_str("mongodb://localhost:27017/")
         .await
