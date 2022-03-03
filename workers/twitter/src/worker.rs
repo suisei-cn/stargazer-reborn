@@ -5,7 +5,6 @@ use egg_mode::tweet::user_timeline;
 use egg_mode::user::UserID;
 use egg_mode::Token;
 use eyre::Result;
-use futures_util::future::join_all;
 use futures_util::StreamExt;
 use parking_lot::Mutex;
 use serde_json::Value;
@@ -49,13 +48,9 @@ async fn twitter_task(
 ) -> Result<()> {
     let mut stream =
         TimelineStream::new(user_timeline(UserID::ID(twitter_id), false, true, token)).await?;
-    while let Some(res) = stream.next().await {
-        let tweets = join_all(
-            res?.into_iter()
-                .map(|tweet| Tweet::from_raw(tweet.response)),
-        )
-        .await;
-        for tweet in tweets {
+    while let Some(resp) = stream.next().await {
+        for raw_tweet in resp?.response {
+            let tweet = Tweet::from(raw_tweet);
             let tweet_id = tweet.id;
             if let Err(error) = mq.publish(entity_id, tweet).await {
                 error!(?error, %tweet_id, "Failed to publish tweet");
