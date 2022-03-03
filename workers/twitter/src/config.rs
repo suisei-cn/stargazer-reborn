@@ -41,7 +41,7 @@ impl Default for Config {
         Self {
             id: Uuid::nil(),
             amqp_url: String::from("amqp://guest:guest@localhost:5672"),
-            coordinator_url: String::from("ws://localhost:7000"),
+            coordinator_url: String::from("ws://127.0.0.1:7000"),
             twitter_token: String::new(),
             poll_interval: Duration::from_secs(60),
         }
