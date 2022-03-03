@@ -337,9 +337,16 @@ impl WorkerGroupImpl {
         }
 
         // Worker-task and task-worker map must have the same tasks.
+        let count_unallocated_task = !self.ring.is_empty();
         assert_eq!(
             tasks,
-            self.tasks.keys().copied().collect(),
+            self.tasks
+                .iter()
+                .filter_map(|(id, BoundTask { task: _, worker })| (worker.is_some()
+                    || count_unallocated_task)
+                    .then(|| id))
+                .copied()
+                .collect(),
             "tasks are not synchronized between worker-task and task-worker maps"
         );
 
