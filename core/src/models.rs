@@ -44,6 +44,7 @@ pub struct Task {
 }
 
 /// Event pushed by workers (or addons) to the message queue and received by IM agents.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     /// The unique identifier of the event.
     pub id: Uuid,
