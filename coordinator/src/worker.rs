@@ -1,6 +1,8 @@
 //! Worker node and worker group.
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use consistent_hash_ring::Ring;
@@ -107,6 +109,9 @@ pub struct WorkerGroupImpl {
     pub(crate) tasks: HashMap<Uuid, BoundTask>,
     ring: Ring</* worker */ Uuid>,
     balance_notify: Arc<Notify>,
+
+    #[cfg(debug_assertions)]
+    poison: AtomicBool,
 }
 
 impl Debug for WorkerGroupImpl {
@@ -154,13 +159,35 @@ impl WorkerGroupImpl {
             tasks: HashMap::new(),
             ring: Ring::default(),
             balance_notify,
+
+            #[cfg(debug_assertions)]
+            poison: AtomicBool::new(false),
         }
+    }
+    /// Check if the worker group is poisoned.
+    ///
+    /// # Panics
+    /// Panics when the worker group is poisoned.
+    #[cfg(debug_assertions)]
+    pub fn assert_valid(&self) {
+        assert!(
+            !self.poison.load(Ordering::SeqCst),
+            "Worker group is poisoned"
+        );
     }
     /// Add a new worker to the group.
     pub fn add_worker(&mut self, worker: Arc<Worker>) {
         debug!(worker_id = %worker.id, "Add worker to group");
-        self.ring.insert(worker.id);
-        self.workers.insert(worker.id, worker);
+        let id = worker.id;
+        if self.workers.insert(id, worker).is_some() {
+            warn!(worker_id = %id, "Worker already exists in group. It might be crashed and rejoined the coordinator before a ping was sent.");
+
+            // Unbind tasks on it.
+            self.tasks.retain(|_, task| task.worker != Some(id));
+        } else {
+            // Add the worker to the ring.
+            self.ring.insert(id);
+        }
 
         self.balance_notify.notify_one();
     }
@@ -327,7 +354,10 @@ impl WorkerGroupImpl {
     ///
     /// # Panics
     /// Panics if the group is not consistent.
+    #[cfg(debug_assertions)]
     pub async fn validate(&self) {
+        self.poison.store(true, Ordering::SeqCst);
+
         // Task must only be assigned to one worker.
         let mut tasks = HashSet::new();
         for worker in self.workers.values() {
@@ -371,6 +401,8 @@ impl WorkerGroupImpl {
             ring_nodes, workers,
             "ring nodes are not the same as workers"
         );
+
+        self.poison.store(false, Ordering::SeqCst);
     }
 
     /// Returns the number of workers in the worker group.

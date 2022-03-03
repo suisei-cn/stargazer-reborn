@@ -11,7 +11,7 @@ use mongodb::{Client, Collection};
 use tarpc::context::Context;
 use tokio::sync::oneshot::{channel, Sender};
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 use sg_core::models::Task;
@@ -274,6 +274,47 @@ async fn must_consistent_after_empty_group() {
     tester.increase_workers("test", 1).await;
 
     tester.finish().await;
+}
+
+#[tokio::test]
+async fn must_consistent_after_repeated_join() {
+    let port = free_port();
+    let server = App::new(Config {
+        bind: format!("127.0.0.1:{}", port).parse().unwrap(),
+        ping_interval: Duration::from_secs(9999),
+        ..Default::default()
+    });
+    tokio::spawn(server.clone().serve());
+    sleep(Duration::from_millis(100)).await;
+
+    // Add a task into app.
+    server.add_task(Task {
+        id: Default::default(),
+        entity: Default::default(),
+        kind: String::from("test"),
+        params: Default::default()
+    }).await;
+
+    // A client joined the remote, ...
+    let client = DummyWorker {
+        ws: format!("ws://127.0.0.1:{}", port),
+        id: Default::default(),
+        kind: String::from("test"),
+        tasks: Arc::new(Mutex::new(Default::default()))
+    };
+    // gets a task, and quits immediately before next ping.
+    assert!(timeout(Duration::from_millis(300), client.clone().join_remote()).await.is_err(), "unable to join remote");
+    assert!(!client.tasks.lock().unwrap().is_empty(), "no task received");
+
+    let client = DummyWorker {
+        tasks: Arc::new(Mutex::new(Default::default())),
+        ..client
+    };
+    // Then it joined coordinator again.
+    assert!(timeout(Duration::from_millis(500), client.clone().join_remote()).await.is_err(), "unable to join remote");
+
+    // The worker group shouldn't be poisoned.
+    server.worker_groups.lock().await["test"].with(|wg|wg.assert_valid()).await;
 }
 
 #[tokio::test]
