@@ -6,8 +6,7 @@ use isolanguage_1::LanguageCode;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
-
-use crate::value::Map;
+use serde_json::{Map, Value};
 
 /// Entity for a vtuber.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +40,7 @@ pub struct Task {
     /// Kind of the task.
     pub kind: String,
     /// Parameters of the task.
-    pub params: Map,
+    pub params: Map<String, Value>,
 }
 
 /// Event pushed by workers (or addons) to the message queue and received by IM agents.
@@ -53,7 +52,7 @@ pub struct Event {
     /// Entity affected by the event.
     pub entity: Uuid,
     /// Fields of the event.
-    pub fields: Map,
+    pub fields: Map<String, Value>,
 }
 
 /// IM subscriber.

@@ -31,8 +31,8 @@ impl<T> Drop for ScopedJoinHandle<T> {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-    use tokio::task::yield_now;
 
+    use tokio::task::yield_now;
     use tokio::time::sleep;
 
     use crate::utils::ScopedJoinHandle;
