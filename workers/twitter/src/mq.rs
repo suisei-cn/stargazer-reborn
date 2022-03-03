@@ -4,6 +4,7 @@ use eyre::Result;
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::twitter::Tweet;
@@ -29,6 +30,7 @@ impl MessageQueue {
         .create_channel()
         .await?;
 
+        debug!("Declaring exchange");
         channel
             .exchange_declare(
                 "events",
@@ -49,6 +51,7 @@ impl MessageQueue {
     /// # Errors
     /// Returns an error if the message can't be published.
     pub async fn publish(&self, entity_id: Uuid, tweet: Tweet) -> Result<()> {
+        info!(tweet_id = %tweet.id, %entity_id, "Publishing tweet");
         drop(
             self.channel
                 .basic_publish(

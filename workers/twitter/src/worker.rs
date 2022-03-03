@@ -85,6 +85,7 @@ impl WorkerRpc for TwitterWorker {
 
         let fut = async move {
             loop {
+                info!(user_id=?id, "Spawning twitter task");
                 if let Err(error) = twitter_task(
                     id.clone(),
                     &token,

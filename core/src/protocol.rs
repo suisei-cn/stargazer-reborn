@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::adapter::WsTransport;
 use crate::models::Task;
+use tracing::{info, debug};
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]
@@ -58,8 +59,11 @@ where
             req.headers_mut()
                 .insert("Sg-Worker-ID", id.to_string().parse()?);
 
+            debug!("Connecting to coordinator");
             let (stream, _) = tokio_tungstenite::connect_async(req).await?;
             let channel = BaseChannel::with_defaults(WsTransport::new(stream));
+
+            info!("Coordinator connected, ready to receive tasks.");
             channel.execute(self.serve()).await;
             Ok(())
         })
