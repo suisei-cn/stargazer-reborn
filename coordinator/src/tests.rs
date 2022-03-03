@@ -288,22 +288,29 @@ async fn must_consistent_after_repeated_join() {
     sleep(Duration::from_millis(100)).await;
 
     // Add a task into app.
-    server.add_task(Task {
-        id: Default::default(),
-        entity: Default::default(),
-        kind: String::from("test"),
-        params: Default::default()
-    }).await;
+    server
+        .add_task(Task {
+            id: Default::default(),
+            entity: Default::default(),
+            kind: String::from("test"),
+            params: Default::default(),
+        })
+        .await;
 
     // A client joined the remote, ...
     let client = DummyWorker {
         ws: format!("ws://127.0.0.1:{}", port),
         id: Default::default(),
         kind: String::from("test"),
-        tasks: Arc::new(Mutex::new(Default::default()))
+        tasks: Arc::new(Mutex::new(Default::default())),
     };
     // gets a task, and quits immediately before next ping.
-    assert!(timeout(Duration::from_millis(300), client.clone().join_remote()).await.is_err(), "unable to join remote");
+    assert!(
+        timeout(Duration::from_millis(300), client.clone().join_remote())
+            .await
+            .is_err(),
+        "unable to join remote"
+    );
     assert!(!client.tasks.lock().unwrap().is_empty(), "no task received");
 
     let client = DummyWorker {
@@ -311,10 +318,17 @@ async fn must_consistent_after_repeated_join() {
         ..client
     };
     // Then it joined coordinator again.
-    assert!(timeout(Duration::from_millis(500), client.clone().join_remote()).await.is_err(), "unable to join remote");
+    assert!(
+        timeout(Duration::from_millis(500), client.clone().join_remote())
+            .await
+            .is_err(),
+        "unable to join remote"
+    );
 
     // The worker group shouldn't be poisoned.
-    server.worker_groups.lock().await["test"].with(|wg|wg.assert_valid()).await;
+    server.worker_groups.lock().await["test"]
+        .with(|wg| wg.assert_valid())
+        .await;
 }
 
 #[tokio::test]
