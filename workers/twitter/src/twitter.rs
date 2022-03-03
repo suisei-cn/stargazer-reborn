@@ -14,11 +14,16 @@ use serde::{Deserialize, Serialize};
 /// Represents a tweet.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Tweet {
-    id: u64,
-    text: String,
-    photos: Vec<String>,
-    link: String,
-    is_rt: bool,
+    /// The tweet's unique identifier.
+    pub id: u64,
+    /// The tweet's text.
+    pub text: String,
+    /// URLs of media attached to the tweet.
+    pub photos: Vec<String>,
+    /// The url of the tweet.
+    pub link: String,
+    /// Whether the tweet is a retweet.
+    pub is_rt: bool,
 }
 
 impl From<RawTweet> for Tweet {
