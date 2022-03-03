@@ -1,5 +1,8 @@
+//! Worker implementation.
+
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use egg_mode::tweet::user_timeline;
 use egg_mode::user::UserID;
@@ -10,6 +13,8 @@ use parking_lot::Mutex;
 use serde_json::Value;
 use tap::TapOptional;
 use tarpc::context::Context;
+use tokio::time::interval;
+use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -17,47 +22,32 @@ use sg_core::models::Task;
 use sg_core::protocol::WorkerRpc;
 use sg_core::utils::ScopedJoinHandle;
 
-use crate::models::Tweet;
 use crate::mq::MessageQueue;
-use crate::twitter::TimelineStream;
+use crate::twitter::{TimelineStream, Tweet};
+use crate::Config;
 
+/// Twitter worker.
 #[derive(Clone)]
 pub struct TwitterWorker {
     token: Arc<Token>,
     mq: Arc<MessageQueue>,
+    interval: Duration,
 
     #[allow(clippy::type_complexity)]
     tasks: Arc<Mutex<HashMap<Uuid, (Task, ScopedJoinHandle<()>)>>>,
 }
 
 impl TwitterWorker {
-    pub fn new(token: String, mq: MessageQueue) -> Self {
+    /// Creates a new worker.
+    #[must_use]
+    pub fn new(config: Config, mq: MessageQueue) -> Self {
         Self {
-            token: Arc::new(Token::Bearer(token)),
+            token: Arc::new(Token::Bearer(config.twitter_token)),
             mq: Arc::new(mq),
+            interval: config.poll_interval,
             tasks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-}
-
-async fn twitter_task(
-    user_id: UserID,
-    token: &Token,
-    entity_id: Uuid,
-    mq: &MessageQueue,
-) -> Result<()> {
-    let mut stream =
-        TimelineStream::new(user_timeline(user_id, false, true, token)).await?;
-    while let Some(resp) = stream.next().await {
-        for raw_tweet in resp?.response {
-            let tweet = Tweet::from(raw_tweet);
-            let tweet_id = tweet.id;
-            if let Err(error) = mq.publish(entity_id, tweet).await {
-                error!(?error, %tweet_id, "Failed to publish tweet");
-            }
-        }
-    }
-    Ok(())
 }
 
 #[tarpc::server]
@@ -89,13 +79,25 @@ impl WorkerRpc for TwitterWorker {
             }
         };
 
-        let token = self.token.clone();
-
         // Prepare the worker future.
+        let token = self.token.clone();
+        let poll_interval = self.interval;
+
         let fut = async move {
             loop {
-                if let Err(error) = twitter_task(id.clone(), &token, task.entity.into(), &*self.mq).await {
+                if let Err(error) = twitter_task(
+                    id.clone(),
+                    &token,
+                    task.entity.into(),
+                    &*self.mq,
+                    poll_interval,
+                )
+                .await
+                {
                     error!(?error, "Failed to fetch timeline");
+
+                    // Sleep to avoid looping if the task always fails.
+                    sleep(poll_interval).await;
                 }
             }
         };
@@ -122,4 +124,35 @@ impl WorkerRpc for TwitterWorker {
             .cloned()
             .collect()
     }
+}
+
+// Fetch the timeline for the given user and send the tweets to the message queue.
+async fn twitter_task(
+    user_id: UserID,
+    token: &Token,
+    entity_id: Uuid,
+    mq: &MessageQueue,
+    poll_interval: Duration,
+) -> Result<()> {
+    let mut ticker = interval(poll_interval);
+
+    // Construct a stream of tweets.
+    let mut stream = TimelineStream::new(user_timeline(user_id, false, true, token)).await?;
+    while let Some(resp) = stream.next().await {
+        // Parse income tweets.
+        for raw_tweet in resp?.response {
+            let tweet_id = raw_tweet.id;
+            let tweet = Tweet::from(raw_tweet);
+
+            // Send tweet to message queue.
+            if let Err(error) = mq.publish(entity_id, tweet).await {
+                error!(?error, %tweet_id, "Failed to publish tweet");
+            }
+        }
+
+        // Tick.
+        ticker.tick().await;
+    }
+
+    Ok(())
 }

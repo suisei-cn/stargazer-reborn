@@ -1,16 +1,23 @@
+//! Message queue for the Twitter worker.
+
 use eyre::Result;
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind};
 use uuid::Uuid;
 
-use crate::models::Tweet;
+use crate::twitter::Tweet;
 
+/// A connection to a `RabbitMQ` server.
 pub struct MessageQueue {
     channel: Channel,
 }
 
 impl MessageQueue {
+    /// Connect to a `RabbitMQ` server.
+    ///
+    /// # Errors
+    /// Returns an error if the connection fails or the exchange can't be declared.
     pub async fn new(addr: &str) -> Result<Self> {
         let channel = Connection::connect(
             addr,
@@ -36,6 +43,11 @@ impl MessageQueue {
 
         Ok(Self { channel })
     }
+
+    /// Publish a tweet to the message queue.
+    ///
+    /// # Errors
+    /// Returns an error if the message can't be published.
     pub async fn publish(&self, entity_id: Uuid, tweet: Tweet) -> Result<()> {
         drop(
             self.channel
@@ -43,7 +55,7 @@ impl MessageQueue {
                     "events",
                     &format!("{}.twitter", entity_id),
                     BasicPublishOptions::default(),
-                    &*serde_json::to_vec(&tweet).unwrap(),
+                    &*serde_json::to_vec(&tweet)?,
                     BasicProperties::default(),
                 )
                 .await?,

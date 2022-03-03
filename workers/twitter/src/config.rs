@@ -1,5 +1,7 @@
 //! Twitter worker config.
 
+use std::time::Duration;
+
 use eyre::Result;
 use figment::providers::{Env, Serialized};
 use figment::Figment;
@@ -17,6 +19,9 @@ pub struct Config {
     pub coordinator_url: String,
     /// Twitter API token.
     pub twitter_token: String,
+    /// Interval between twitter polls.
+    #[serde(with = "humantime_serde")]
+    pub poll_interval: Duration,
 }
 
 impl Config {
@@ -38,12 +43,15 @@ impl Default for Config {
             amqp_url: String::from("amqp://guest:guest@localhost:5672"),
             coordinator_url: String::from("ws://localhost:7000"),
             twitter_token: String::new(),
+            poll_interval: Duration::from_secs(60),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use figment::Jail;
     use uuid::Uuid;
 
@@ -65,6 +73,7 @@ mod tests {
             jail.set_env("WORKER_AMQP_URL", "amqp://admin:admin@localhost:5672");
             jail.set_env("WORKER_COORDINATOR_URL", "ws://localhost:8080");
             jail.set_env("WORKER_TWITTER_TOKEN", "blabla");
+            jail.set_env("WORKER_POLL_INTERVAL", "30s");
             assert_eq!(
                 Config::from_env().unwrap(),
                 Config {
@@ -72,6 +81,7 @@ mod tests {
                     amqp_url: String::from("amqp://admin:admin@localhost:5672"),
                     coordinator_url: String::from("ws://localhost:8080"),
                     twitter_token: String::from("blabla"),
+                    poll_interval: Duration::from_secs(30),
                 }
             );
             Ok(())
