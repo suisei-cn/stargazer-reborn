@@ -1,5 +1,6 @@
 //! Twitter struct and stream.
 
+use std::cmp::max;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -53,7 +54,8 @@ impl From<RawTweet> for Tweet {
 
 /// Twitter stream.
 pub struct TimelineStream {
-    timeline: Option<TimelineFuture>,
+    fut: Option<TimelineFuture>,
+    max_id: u64,
 }
 
 impl TimelineStream {
@@ -63,8 +65,10 @@ impl TimelineStream {
     /// Returns an error if the stream could not be created due to network issues.
     pub async fn new(timeline: Timeline) -> Result<Self, Error> {
         let (timeline, _) = timeline.start().await?;
+        let max_id = timeline.max_id.unwrap_or_default();
         Ok(Self {
-            timeline: Some(timeline.newer(None)),
+            fut: Some(timeline.newer(None)),
+            max_id,
         })
     }
 }
@@ -73,15 +77,16 @@ impl Stream for TimelineStream {
     type Item = Result<Response<Vec<RawTweet>>, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(mut timeline) = self.timeline.take() {
-            match timeline.poll_unpin(cx) {
+        if let Some(mut fut) = self.fut.take() {
+            match fut.poll_unpin(cx) {
                 Poll::Ready(Ok((timeline, resp))) => {
-                    self.timeline = Some(timeline.newer(None));
+                    self.max_id = max(self.max_id, timeline.max_id.unwrap_or_default());
+                    self.fut = Some(timeline.older(Some(self.max_id)));
                     Poll::Ready(Some(Ok(resp)))
                 }
                 Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
                 Poll::Pending => {
-                    self.timeline = Some(timeline);
+                    self.fut = Some(fut);
                     Poll::Pending
                 }
             }
