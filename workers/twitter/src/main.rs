@@ -1,4 +1,7 @@
+//! Twitter worker binary.
+
 #![allow(clippy::module_name_repetitions)]
+#![deny(missing_docs)]
 
 use eyre::Result;
 
@@ -8,11 +11,10 @@ use crate::config::Config;
 use crate::mq::MessageQueue;
 use crate::worker::TwitterWorker;
 
-mod config;
-mod models;
-mod mq;
-mod twitter;
-mod worker;
+pub mod config;
+pub mod mq;
+pub mod twitter;
+pub mod worker;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,7 +25,7 @@ async fn main() -> Result<()> {
 
     let mq = MessageQueue::new(&*config.amqp_url).await?;
 
-    TwitterWorker::new(config.twitter_token, mq)
+    TwitterWorker::new(config.clone(), mq)
         .join(config.coordinator_url, config.id, "twitter")
         .await?;
 
