@@ -17,7 +17,6 @@ use uuid::Uuid;
 use sg_core::models::Task;
 use sg_core::protocol::{WorkerRpc, WorkerRpcExt};
 use sg_core::utils::ScopedJoinHandle;
-use sg_core::value::Value;
 
 use crate::config::Config;
 use crate::db::DB;
@@ -322,8 +321,7 @@ async fn must_db() {
 
     // Update a task.
     let mut task = tasks.pop().unwrap();
-    task.params
-        .insert("test".into(), Value::String("test".into()));
+    task.params.insert("test".into(), "test".into());
     tasks.push(task.clone());
     collection
         .update_one(
