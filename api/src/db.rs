@@ -1,22 +1,15 @@
 //! Database access.
 
-use std::collections::HashMap;
-
 use color_eyre::Result;
-use futures_util::StreamExt;
-use mongodb::bson::oid::ObjectId;
-use mongodb::change_stream::event::OperationType;
-use mongodb::options::{ChangeStreamOptions, FullDocumentType};
-use mongodb::{bson, Client, Collection};
-use tracing::{error, info};
+use mongodb::{Client, Collection};
 
-use sg_core::models::{InDB, Task};
+use sg_core::models::InDB;
 
-use crate::{get_config, Config};
+use crate::get_config;
 
 /// Database instance.
 pub struct DB {
-    collection: Collection<InDB<i32>>,
+    _collection: Collection<InDB<i32>>,
 }
 
 impl DB {
@@ -30,14 +23,16 @@ impl DB {
         let db = client.database(&config.mongo_db);
         let collection = db.collection(&config.mongo_collection);
 
-        Ok(Self { collection })
+        Ok(Self {
+            _collection: collection,
+        })
     }
 
     pub async fn new_session() -> Result<()> {
         Ok(())
     }
 
-    pub async fn lookup_session(session_id: String) -> Result<()> {
+    pub async fn lookup_session(_session_id: String) -> Result<()> {
         Ok(())
     }
 }
