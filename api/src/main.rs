@@ -1,8 +1,10 @@
-mod_use::mod_use![model, app, config, db, handler];
+#![allow(macro_expanded_macro_exports_accessed_by_absolute_paths)]
+
+mod_use::mod_use![rpc, app, config, db, handler, utils];
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
-    color_eyre::install();
+    color_eyre::install()?;
     let config = get_config();
     let app = get_app().await?;
 
