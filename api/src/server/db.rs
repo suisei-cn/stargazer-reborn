@@ -5,8 +5,9 @@ use mongodb::{Client, Collection};
 
 use sg_core::models::InDB;
 
-use crate::get_config;
+use crate::server::get_config;
 
+#[derive(Debug, Clone)]
 /// Database instance.
 pub struct DB {
     _collection: Collection<InDB<i32>>,

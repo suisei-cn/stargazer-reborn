@@ -1,13 +1,19 @@
+use axum::{http::StatusCode, response::Response as AxumResponse, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{model::GetUser, timestamp};
+use crate::{
+    rpc::{model::GetUser, Response},
+    timestamp,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method", content = "params")]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum Requests {
     GetUser(GetUser),
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseObject<T> {
     pub data: T,
@@ -47,7 +53,28 @@ impl<T> ResponseObject<T> {
 
 impl<T: Serialize> ResponseObject<T> {
     #[inline]
-    pub fn to_json(&self) -> serde_json::error::Result<String> {
-        serde_json::to_string(&self)
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(&self).expect("Failed to serialize response object")
+    }
+}
+
+impl<'a, T: Deserialize<'a>> ResponseObject<T> {
+    #[inline]
+    pub fn try_from_json(json: &'a str) -> serde_json::error::Result<T> {
+        serde_json::from_str(json)
+    }
+}
+
+impl<R: Response> axum::response::IntoResponse for ResponseObject<R> {
+    fn into_response(self) -> AxumResponse {
+        let status = if self.success {
+            StatusCode::OK
+        } else {
+            StatusCode::BAD_REQUEST
+        };
+
+        let mut body = Json(self).into_response();
+        *body.status_mut() = status;
+        body
     }
 }

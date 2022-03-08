@@ -1,30 +1,22 @@
 crate::new_method! {
-    "getUser",
+    "getUser" :=
     GetUser {
         user_id: String
-    },
-    success: [
-        UserFound {
-            user_id: String,
-            user_info: String
-        },
-        User {
-            user_id: String,
-            user_info: String
-        }
-
-    ],
-    failed: [
-        UserNotFound ,
-        Unauthorized {
-            expired: bool
-        }
-    ]
+    } => User {
+        user_id: String,
+        user_info: String
+    }
 }
 
 #[cfg(test)]
 mod test_macro {
-    use crate::{model::*, timestamp, Request, Requests};
+    use crate::{
+        rpc::{
+            model::{GetUser, User},
+            ApiError, Request, Requests,
+        },
+        timestamp,
+    };
 
     #[test]
     fn test_gen() {
@@ -42,19 +34,19 @@ mod test_macro {
         let resp = format!(
             "{{\"data\":{{\"user_id\":\"foo\",\"user_info\":\"bar\"}},\"success\":true,\"time\":{ts}}}",
         );
-        let resp_obj = GetUserResp::UserFound(UserFound {
+        let resp_obj = User {
             user_id: "foo".to_string(),
             user_info: "bar".to_string(),
-        });
+        };
 
         assert_eq!(resp, serde_json::to_string(&resp_obj.packed()).unwrap(),);
 
         let ts = timestamp();
         let resp = format!(
-            "{{\"data\":{{\"errors\":[\"UserNotFound\"]}},\"success\":false,\"time\":{ts}}}",
+            "{{\"data\":{{\"error\":[\"User `foo` not found\"]}},\"success\":false,\"time\":{ts}}}",
         );
-        let resp_obj = GetUserResp::UserNotFound(UserNotFound::new());
+        let resp_obj = ApiError::user_not_found("foo").packed();
 
-        assert_eq!(resp, serde_json::to_string(&resp_obj.packed()).unwrap(),);
+        assert_eq!(resp, serde_json::to_string(&resp_obj).unwrap(),);
     }
 }
