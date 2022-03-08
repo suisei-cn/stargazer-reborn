@@ -79,8 +79,8 @@ impl Stream for TimelineStream {
         if let Some(mut fut) = self.fut.take() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(Ok((timeline, resp))) => {
-                    self.max_id = max(self.max_id, timeline.max_id.unwrap_or_default());
-                    self.fut = Some(timeline.older(Some(self.max_id)));
+                    self.max_id = max(self.max_id, timeline.max_id);
+                    self.fut = Some(timeline.older(self.max_id));
                     Poll::Ready(Some(Ok(resp)))
                 }
                 Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),

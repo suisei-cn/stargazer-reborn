@@ -2,6 +2,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 
+use eyre::{eyre, Result, WrapErr};
 use isolanguage_1::LanguageCode;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Uuid;
@@ -54,6 +55,25 @@ pub struct Event {
     pub entity: Uuid,
     /// Fields of the event.
     pub fields: Map<String, Value>,
+}
+
+impl Event {
+    /// Create a new event with its fields set by a serializable object.
+    ///
+    /// # Errors
+    /// Returns an error if the fields cannot be serialized into a map.
+    pub fn from_serializable(kind: &str, entity: Uuid, fields: impl Serialize) -> Result<Self> {
+        Ok(Self {
+            id: Uuid::new(),
+            kind: kind.to_string(),
+            entity,
+            fields: serde_json::to_value(fields)
+                .wrap_err("event fields can't be converted into json value")?
+                .as_object()
+                .ok_or_else(|| eyre!("event field is not a map"))?
+                .clone(),
+        })
+    }
 }
 
 /// IM subscriber.

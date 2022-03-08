@@ -18,11 +18,11 @@ use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use sg_core::models::Task;
+use sg_core::models::{Event, Task};
+use sg_core::mq::MessageQueue;
 use sg_core::protocol::WorkerRpc;
 use sg_core::utils::ScopedJoinHandle;
 
-use crate::mq::MessageQueue;
 use crate::twitter::{TimelineStream, Tweet};
 use crate::Config;
 
@@ -144,9 +144,10 @@ async fn twitter_task(
         for raw_tweet in resp?.response {
             let tweet_id = raw_tweet.id;
             let tweet = Tweet::from(raw_tweet);
+            let event = Event::from_serializable("twitter", entity_id.into(), tweet)?;
 
             // Send tweet to message queue.
-            if let Err(error) = mq.publish(entity_id, tweet).await {
+            if let Err(error) = mq.publish(event).await {
                 error!(?error, %tweet_id, "Failed to publish tweet");
             }
         }
