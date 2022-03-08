@@ -1,6 +1,4 @@
-#![allow(macro_expanded_macro_exports_accessed_by_absolute_paths)]
-
-mod_use::mod_use![rpc, app, config, db, handler, utils];
+use api::server::{get_app, get_config};
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {

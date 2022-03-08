@@ -61,7 +61,7 @@ mod tests {
 
     use figment::Jail;
 
-    use crate::config::Config;
+    use crate::server::Config;
 
     #[test]
     fn must_default() {

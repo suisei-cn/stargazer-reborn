@@ -1,7 +1,7 @@
 use color_eyre::{eyre::Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::ResponseObject;
+use crate::rpc::ResponseObject;
 
 pub trait Request: DeserializeOwned {
     const METHOD: &'static str;
@@ -14,7 +14,7 @@ pub trait Request: DeserializeOwned {
 
 pub trait Response: Serialize + Sized {
     fn is_successful(&self) -> bool;
-    fn into_json(self) -> serde_json::error::Result<String> {
+    fn into_json(self) -> String {
         let success = self.is_successful();
         ResponseObject::new(self, success).to_json()
     }

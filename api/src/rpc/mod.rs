@@ -1,121 +1,62 @@
-mod_use::mod_use![wrapper, traits];
+mod_use::mod_use![wrapper, traits, error];
 
 pub mod model;
 
 #[macro_export]
 macro_rules! new_method {
-    ($method:literal,
-        $name:ident { $( $field_name:ident : $field_type:ty ),* }
-        $(,)?
-        success: [
-            $(
-                $success_resp:ident {
-                    $( $success_resp_field_name:ident : $success_resp_field_type:ty ), *
-                }
-                $(,)?
-            ),*
-        ]
-        $(,)?
-        failed: [
-            $(
-                $failed_resp:ident
-                $([ $( $reason:literal $(,)? ) * ])?
-                $({ $( $failed_resp_field_name:ident : $failed_resp_field_type:ty ), * })?
-                 $(,)?
-            ),*
-        ]
+    ($method:literal :=
+        $req:ident { $( $req_field_name:ident : $req_field_type:ty ),* }
+        =>
+        $resp:ident { $( $resp_field_name:ident : $resp_field_type:ty ),* }
     ) => {
-        ::paste::paste! {
-            #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
-            pub struct $name {
-                $( pub $field_name : $field_type, )*
+
+        #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        pub struct $req {
+            $(pub $req_field_name : $req_field_type, )*
+        }
+
+        impl $req {
+            #[inline]
+            pub fn new($( $req_field_name : $req_field_type, )*) -> Self {
+                Self {
+                    $( $req_field_name, )*
+                }
             }
+        }
 
-            impl $crate::Request for $name {
-                const METHOD: &'static str = $method;
-                type Res = [<$name Resp>];
-            }
+        impl $crate::rpc::Request for $req {
+            const METHOD: &'static str = $method;
+            type Res = $resp;
+        }
 
-            $(
-                #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
-                pub struct $success_resp {
-                    $( $success_resp_field_name : $success_resp_field_type, )*
-                }
+        #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        pub struct $resp {
+            $(pub $resp_field_name : $resp_field_type, )*
+        }
 
-                impl $success_resp {
-                    #[inline]
-                    #[allow(clippy::new_without_default)]
-                    pub fn new($( $success_resp_field_name : $success_resp_field_type, )*) -> Self {
-                        Self {
-                            $( $success_resp_field_name, )*
-                        }
-                    }
-                }
-            )*
-
-            $(
-                #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize)]
-                pub struct $failed_resp {
-                    $( pub $( $failed_resp_field_name : $failed_resp_field_type, )* )?
-                    errors: Vec<String>
-                }
-
-                impl $failed_resp {
-                    #[inline]
-                    #[allow(clippy::new_without_default)]
-                    pub fn new($( $( $failed_resp_field_name : $failed_resp_field_type, )* )?) -> Self {
-                        Self {
-                            errors: vec![
-                                stringify!($failed_resp).to_owned(),
-                                $( $($reason .to_owned() ,)*)?
-                            ],
-                            $( $( $failed_resp_field_name, )* )?
-                        }
-                    }
-
-                    #[inline]
-                    pub fn with_reason(&mut self, error: String) -> &mut Self {
-                        self.errors.push(error);
-                        self
-                    }
-
-                    #[inline]
-                    pub fn with_reasons(&mut self, error: &[String]) -> &mut Self {
-                        self.errors.extend_from_slice(error);
-                        self
-                    }
-                }
-            )*
-
-            #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize)]
-            #[serde(untagged)]
-            pub enum [<$name Resp>] {
-                $(
-                    $success_resp ( $success_resp ),
-                )*
-                $(
-                    $failed_resp ( $failed_resp ),
-                )*
-            }
-
-            impl [<$name Resp>] {
-                pub fn packed(self) -> $crate::ResponseObject<Self> {
-                    let success = $crate::Response::is_successful(&self);
-                    $crate::ResponseObject::new(self, success)
+        impl $resp {
+            #[inline]
+            pub fn new($( $resp_field_name : $resp_field_type, )*) -> Self {
+                Self {
+                    $( $resp_field_name, )*
                 }
             }
 
-            impl $crate::Response for [<$name Resp>] {
-                fn is_successful(&self) -> bool {
-                    match self {
-                        $(
-                            [<$name Resp>]::$success_resp{ .. } => true,
-                        )*
-                        $(
-                            [<$name Resp>]::$failed_resp{ .. } => false,
-                        )*
-                    }
-                }
+            pub fn packed(self) -> $crate::rpc::ResponseObject<Self> {
+                let success = $crate::rpc::Response::is_successful(&self);
+                    $crate::rpc::ResponseObject::new(self, success)
+            }
+        }
+
+        impl $crate::rpc::Response for $resp {
+            fn is_successful(&self) -> bool {
+                true
+            }
+        }
+
+        impl ::axum::response::IntoResponse for $resp {
+            fn into_response(self) -> ::axum::response::Response {
+                self.packed().into_response()
             }
         }
     };
