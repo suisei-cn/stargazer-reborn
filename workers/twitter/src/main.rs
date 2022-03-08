@@ -6,14 +6,13 @@
 use eyre::{Result, WrapErr};
 use tracing_subscriber::EnvFilter;
 
+use sg_core::mq::MessageQueue;
 use sg_core::protocol::WorkerRpcExt;
 
 use crate::config::Config;
-use crate::mq::MessageQueue;
 use crate::worker::TwitterWorker;
 
 pub mod config;
-pub mod mq;
 pub mod twitter;
 pub mod worker;
 

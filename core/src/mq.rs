@@ -1,15 +1,12 @@
-//! Message queue for the Twitter worker.
+//! Message queue for workers.
 
 use eyre::Result;
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind};
 use tracing::{debug, info};
-use uuid::Uuid;
 
-use sg_core::models::Event;
-
-use crate::twitter::Tweet;
+use crate::models::Event;
 
 /// A connection to a `RabbitMQ` server.
 pub struct MessageQueue {
@@ -52,14 +49,8 @@ impl MessageQueue {
     ///
     /// # Errors
     /// Returns an error if the message can't be published.
-    pub async fn publish(&self, entity_id: Uuid, tweet: Tweet) -> Result<()> {
-        info!(tweet_id = %tweet.id, %entity_id, "Publishing tweet");
-        let event = Event {
-            id: Uuid::new_v4().into(),
-            kind: String::from("twitter"),
-            entity: entity_id.into(),
-            fields: serde_json::to_value(tweet)?.as_object().unwrap().clone(),
-        };
+    pub async fn publish(&self, event: Event) -> Result<()> {
+        info!(event_id = %event.id, event_kind = %event.kind, "Publishing event");
         drop(
             self.channel
                 .basic_publish(

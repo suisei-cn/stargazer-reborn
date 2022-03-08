@@ -5,5 +5,7 @@
 pub mod adapter;
 pub mod error;
 pub mod models;
+#[cfg(feature = "mq")]
+pub mod mq;
 pub mod protocol;
 pub mod utils;
