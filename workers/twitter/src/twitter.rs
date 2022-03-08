@@ -54,8 +54,8 @@ impl From<RawTweet> for Tweet {
 
 /// Twitter stream.
 pub struct TimelineStream {
+    max_id: Option<u64>,
     fut: Option<TimelineFuture>,
-    max_id: u64,
 }
 
 impl TimelineStream {
@@ -65,10 +65,9 @@ impl TimelineStream {
     /// Returns an error if the stream could not be created due to network issues.
     pub async fn new(timeline: Timeline) -> Result<Self, Error> {
         let (timeline, _) = timeline.start().await?;
-        let max_id = timeline.max_id.unwrap_or_default();
         Ok(Self {
+            max_id: timeline.max_id,
             fut: Some(timeline.newer(None)),
-            max_id,
         })
     }
 }
