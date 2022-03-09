@@ -1,6 +1,6 @@
 mod_use::mod_use![wrapper, traits, error];
 
-pub mod model;
+pub mod models;
 
 #[macro_export]
 macro_rules! methods {

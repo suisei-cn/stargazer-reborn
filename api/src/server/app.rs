@@ -4,7 +4,7 @@ use axum::{extract::Extension, routing::post, Json, Router};
 use color_eyre::Result;
 
 use crate::{
-    rpc::model::Requests,
+    rpc::models::Requests,
     server::{Context, DB},
 };
 

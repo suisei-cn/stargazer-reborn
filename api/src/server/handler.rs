@@ -5,7 +5,7 @@ use sg_core::models::User;
 
 use crate::{
     rpc::{
-        model::{GetUser, GetUserSettings, Requests, UserSettings},
+        models::{GetUser, GetUserSettings, Requests, UserSettings},
         ApiError, Response,
     },
     server::DB,
