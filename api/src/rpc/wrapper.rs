@@ -1,18 +1,11 @@
 use axum::{http::StatusCode, response::Response as AxumResponse, Json};
 use serde::{Deserialize, Serialize};
+use tracing::log::error;
 
 use crate::{
-    rpc::{model::GetUser, Response},
+    rpc::{ApiError, Response},
     timestamp,
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "method", content = "params")]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub enum Requests {
-    GetUser(GetUser),
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseObject<T> {
@@ -54,7 +47,13 @@ impl<T> ResponseObject<T> {
 impl<T: Serialize> ResponseObject<T> {
     #[inline]
     pub fn to_json(&self) -> String {
-        serde_json::to_string(&self).expect("Failed to serialize response object")
+        match serde_json::to_string(&self) {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Failed to serialize response object: {}", err);
+                ApiError::internal_error().packed().to_json()
+            }
+        }
     }
 }
 

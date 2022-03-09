@@ -14,9 +14,10 @@ pub trait Request: DeserializeOwned {
 
 pub trait Response: Serialize + Sized {
     fn is_successful(&self) -> bool;
-    fn into_json(self) -> String {
+
+    fn packed(self) -> ResponseObject<Self> {
         let success = self.is_successful();
-        ResponseObject::new(self, success).to_json()
+        ResponseObject::new(self, success)
     }
 }
 
