@@ -1,3 +1,4 @@
+use axum::response::IntoResponse;
 use color_eyre::{eyre::Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -18,6 +19,10 @@ pub trait Response: Serialize + Sized {
     fn packed(self) -> ResponseObject<Self> {
         let success = self.is_successful();
         ResponseObject::new(self, success)
+    }
+
+    fn into_axum_response(self) -> axum::response::Response {
+        self.packed().into_response()
     }
 }
 

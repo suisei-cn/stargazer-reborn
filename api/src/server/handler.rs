@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use axum::response::{IntoResponse, Response as AxumResponse};
+use sg_core::models::User;
 
 use crate::{
     rpc::{
-        model::{GetUser, GetUserSettings, Requests, User, UserSettings},
-        ApiError,
+        model::{GetUser, GetUserSettings, Requests, UserSettings},
+        ApiError, Response,
     },
     server::DB,
 };
@@ -18,7 +19,12 @@ pub struct Context {
 macro_rules! dispatch {
     ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: ident),* ) => {
         match $self {
-            $( Requests::$req_variant(req) => $fn(req, $ctx.clone()).await.into_response(), )*
+            $(
+                Requests::$req_variant(req) => match $fn(req, $ctx.clone()).await {
+                    Ok(res) => res.packed().into_response(),
+                    Err(e) => e.packed().into_response(),
+                }
+            )*
             #[allow(unreachable_patterns)]
             _ => ApiError::bad_request("Method does not exist or not implemented").into_response(),
         }
@@ -36,7 +42,7 @@ impl Requests {
 }
 
 async fn get_user(req: GetUser, _ctx: Context) -> Result<User, ApiError> {
-    Ok(User::new(req.user_id, "test".to_owned()))
+    todo!()
 }
 
 async fn get_user_settings(req: GetUserSettings, _ctx: Context) -> Result<UserSettings, ApiError> {

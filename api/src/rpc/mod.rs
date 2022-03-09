@@ -8,7 +8,7 @@ macro_rules! methods {
         $method:literal :=
         $req:ident { $( $req_field_name:ident : $req_field_type:ty ),* }
         ->
-        $resp:ident { $( $resp_field_name:ident : $resp_field_type:ty ),* }
+        $resp:ident $( {  $( $resp_field_name:ident : $resp_field_type:ty ),*  } )?
         $(,)?
     )*) => {
         $(
@@ -31,30 +31,27 @@ macro_rules! methods {
                 type Res = $resp;
             }
 
-            #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
-            pub struct $resp {
-                $(pub $resp_field_name : $resp_field_type, )*
-            }
+            $(
+                #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+                pub struct $resp {
+                    $(pub $resp_field_name : $resp_field_type, )*
+                }
 
-            impl $resp {
-                #[inline]
-                #[allow(clippy::new_without_default)]
-                pub fn new($( $resp_field_name : $resp_field_type, )*) -> Self {
-                    Self {
-                        $( $resp_field_name, )*
+
+                impl $resp {
+                    #[inline]
+                    #[allow(clippy::new_without_default)]
+                    pub fn new($( $resp_field_name : $resp_field_type, )*) -> Self {
+                        Self {
+                            $( $resp_field_name, )*
+                        }
                     }
                 }
-            }
+            )?
 
             impl $crate::rpc::Response for $resp {
                 fn is_successful(&self) -> bool {
                     true
-                }
-            }
-
-            impl ::axum::response::IntoResponse for $resp {
-                fn into_response(self) -> ::axum::response::Response {
-                    $crate::rpc::Response::packed(self).into_response()
                 }
             }
         )*

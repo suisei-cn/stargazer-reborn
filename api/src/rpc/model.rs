@@ -1,11 +1,10 @@
+use sg_core::models::User;
+
 crate::methods! {
     "getUser" :=
     GetUser {
         user_id: String
-    } -> User {
-        user_id: String,
-        user_info: String
-    },
+    } -> User,
     "getUserSettings" :=
     GetUserSettings {
         user_id: String
