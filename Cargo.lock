@@ -124,6 +124,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "async-channel"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,6 +223,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "677d306121baf53310a3fd342d88dc0824f6bbeace68347593658525565abee8"
 
 [[package]]
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "async-trait"
 version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -438,11 +441,15 @@ dependencies = [
  "num-integer",
  "num-traits",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "serde",
  "time",
 =======
  "time 0.1.43",
 >>>>>>> 93c959d (chore: deps)
+=======
+ "time 0.1.43",
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
  "winapi",
 ]
 
@@ -1119,14 +1126,20 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "http-range-header"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfe8eed0a9285ef776bb792479ea3834e8b94e13d615c2f66d03dd50a435a29"
 
 [[package]]
+<<<<<<< HEAD
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "httparse"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1165,9 +1178,12 @@ dependencies = [
  "futures-core",
  "futures-util",
 <<<<<<< HEAD
+<<<<<<< HEAD
  "h2",
 =======
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
  "http",
  "http-body",
  "httparse",
@@ -1182,6 +1198,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 <<<<<<< HEAD
 name = "hyper-tls"
 version = "0.5.0"
@@ -1198,6 +1215,8 @@ dependencies = [
 [[package]]
 =======
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1416,6 +1435,7 @@ checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1424,6 +1444,8 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 [[package]]
 =======
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "miniz_oxide"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2685,7 +2707,10 @@ dependencies = [
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "tokio-util"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2742,7 +2767,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343bc9466d3fe6b0f960ef45960509f84480bf4fd96f92901afe7ff3df9d3a62"
 
 [[package]]
+<<<<<<< HEAD
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "tower-service"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3042,6 +3070,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 <<<<<<< HEAD
+<<<<<<< HEAD
 name = "waker-fn"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3050,6 +3079,8 @@ checksum = "9d5b2c62b4012a3e1eca5a7e077d13b3bf498c4073e33ccd58626607748ceeca"
 [[package]]
 =======
 >>>>>>> 095edd4 (feat: basic structure)
+=======
+>>>>>>> 9784829dde36046d1236170fa4835c8c6b4c4a61
 name = "want"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
