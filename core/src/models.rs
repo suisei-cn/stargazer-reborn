@@ -24,12 +24,28 @@ pub struct Entity {
 /// Meta of the vtuber.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Meta {
-    /// Vtuber's name in different languages. The key must be in ISO 639-1.
-    pub name: HashMap<LanguageCode, String>,
-    /// Preferred language of the vtuber. Must be in ISO 639-1.
-    pub default_language: LanguageCode,
+    /// Vtuber's name.
+    pub name: Name,
     /// Affiliation of the vtuber.
-    pub group: Option<String>,
+    pub group: Option<Uuid>,
+}
+
+/// Name of a vtuber/group.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Name {
+    /// Name in different languages. The key must be in ISO 639-1.
+    pub name: HashMap<LanguageCode, String>,
+    /// Preferred language of the name. Must be in ISO 639-1.
+    pub default_language: LanguageCode,
+}
+
+/// A group/organization of vtubers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Group {
+    /// The unique identifier of the group.
+    pub id: Uuid,
+    /// Group's name.
+    pub name: Name,
 }
 
 /// Defined task for a vtuber.
