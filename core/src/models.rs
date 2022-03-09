@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// Entity for a vtuber.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entity {
     /// The unique identifier of the entity.
     pub id: Uuid,
@@ -21,7 +21,7 @@ pub struct Entity {
 }
 
 /// Meta of the vtuber.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Meta {
     /// Vtuber's name in different languages. The key must be in ISO 639-1.
     pub name: HashMap<LanguageCode, String>,
@@ -32,7 +32,7 @@ pub struct Meta {
 }
 
 /// Defined task for a vtuber.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     /// The unique identifier of the task.
     pub id: Uuid,
@@ -45,7 +45,7 @@ pub struct Task {
 }
 
 /// Event pushed by workers (or addons) to the message queue and received by IM agents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
     /// The unique identifier of the event.
     pub id: Uuid,
@@ -77,6 +77,7 @@ impl Event {
 }
 
 /// IM subscriber.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct User {
     /// The unique identifier of the user. The same physical user in different IMs should have different id.
     pub id: Uuid,
@@ -91,6 +92,7 @@ pub struct User {
 }
 
 /// Filter for events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventFilter {
     /// Event must be related to these entities.
     pub entities: HashSet<Uuid>,
