@@ -53,6 +53,10 @@ impl ApiError {
         ApiError::new(vec!["Unauthorized".to_owned()])
     }
 
+    pub fn unknown_method() -> Self {
+        ApiError::new(vec!["Unknown method".to_owned()])
+    }
+
     pub fn user_not_found<'a>(user_id: impl Into<&'a str>) -> Self {
         ApiError::new(vec![format!("User `{}` not found", user_id.into())])
     }

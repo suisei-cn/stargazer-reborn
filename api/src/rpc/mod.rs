@@ -61,7 +61,9 @@ macro_rules! methods {
         #[serde(rename_all = "camelCase")]
         #[non_exhaustive]
         pub enum Requests {
-            $( $req($req) ),*
+            $( $req($req), )*
+            #[serde(other)]
+            Unknown
         }
     };
 }

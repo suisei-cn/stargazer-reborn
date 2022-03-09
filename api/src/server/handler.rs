@@ -25,8 +25,12 @@ macro_rules! dispatch {
                     Err(e) => e.packed().into_response(),
                 }
             )*
+            Self::Unknown => ApiError::unknown_method().packed().into_response(),
             #[allow(unreachable_patterns)]
-            _ => ApiError::bad_request("Method does not exist or not implemented").into_response(),
+            _ => {
+                tracing::log::warn!("Method not implemented");
+                ApiError::internal_error().into_response()
+            },
         }
     };
 }
