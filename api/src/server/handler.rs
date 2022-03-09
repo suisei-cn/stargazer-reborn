@@ -1,21 +1,18 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::Extension,
-    http::StatusCode,
-    response::{IntoResponse, Response as AxumResponse},
-};
+use axum::response::{IntoResponse, Response as AxumResponse};
 
 use crate::{
     rpc::{
-        model::{GetUser, User},
-        ApiError, Requests,
+        model::{GetUser, GetUserSettings, Requests, User, UserSettings},
+        ApiError,
     },
     server::DB,
 };
 
-pub async fn get_user_settings(Extension(_db): Extension<Arc<DB>>) -> impl IntoResponse {
-    (StatusCode::OK, "OK")
+#[derive(Debug, Clone)]
+pub struct Context {
+    pub db: Arc<DB>,
 }
 
 macro_rules! dispatch {
@@ -30,15 +27,18 @@ macro_rules! dispatch {
 
 impl Requests {
     pub async fn handle(self, ctx: Context) -> AxumResponse {
-        dispatch!(self, ctx, GetUser => get_user )
+        dispatch![
+            self, ctx,
+            GetUser => get_user,
+            GetUserSettings => get_user_settings
+        ]
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Context {
-    pub db: Arc<DB>,
 }
 
 async fn get_user(req: GetUser, _ctx: Context) -> Result<User, ApiError> {
     Ok(User::new(req.user_id, "test".to_owned()))
+}
+
+async fn get_user_settings(req: GetUserSettings, _ctx: Context) -> Result<UserSettings, ApiError> {
+    Ok(UserSettings::new())
 }
