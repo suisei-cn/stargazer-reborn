@@ -8,6 +8,7 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use url::Url;
 
 /// Entity for a vtuber.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,7 +87,7 @@ pub struct User {
     /// Name of the user.
     pub name: String,
     /// Avatar of the user.
-    pub avatar: Vec<u8>,
+    pub avatar: Url,
     /// The events that the user is subscribed to.
     pub event_filter: EventFilter,
 }

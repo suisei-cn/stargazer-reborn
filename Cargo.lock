@@ -551,6 +551,7 @@ dependencies = [
  "tokio-reactor-trait",
  "tokio-tungstenite",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -2986,6 +2987,7 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]
