@@ -4,12 +4,12 @@ mod bililive;
 mod config;
 mod worker;
 
-use eyre::{Result, WrapErr};
-use tracing_subscriber::EnvFilter;
-use sg_core::mq::MessageQueue;
-use sg_core::protocol::WorkerRpcExt;
 use crate::config::Config;
 use crate::worker::BililiveWorker;
+use eyre::{Result, WrapErr};
+use sg_core::mq::MessageQueue;
+use sg_core::protocol::WorkerRpcExt;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
