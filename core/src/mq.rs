@@ -55,6 +55,7 @@ impl<T: Deref<Target = dyn MessageQueue> + Send + Sync> MessageQueue for T {
 }
 
 /// A message queue backed by `RabbitMQ`.
+#[derive(Clone)]
 pub struct RabbitMQ {
     exchange: String,
     channel: Channel,
