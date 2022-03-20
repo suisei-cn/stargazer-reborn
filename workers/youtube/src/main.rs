@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     let worker_fut = YoutubeWorker::new(config.clone(), registry.clone()).join(
         config.coordinator_url.clone(),
         config.id,
-        "twitter",
+        "youtube",
     );
     let server = serve(&config, registry, mq);
 
