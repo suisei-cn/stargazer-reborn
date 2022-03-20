@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Router, Server};
+use axum_xml::Xml;
 use eyre::Result;
 use parking_lot::RwLock;
 use serde::Deserialize;
@@ -13,7 +14,7 @@ use tracing::{error, info, warn};
 
 use sg_core::mq::MessageQueue;
 
-use crate::models::{ChallengeQuery, Mode};
+use crate::models::{ChallengeQuery, Feed, Mode};
 use crate::registry::Registry;
 use crate::Config;
 
@@ -33,7 +34,7 @@ impl IntoResponse for ChallengeError {
 
 #[derive(Deserialize)]
 struct TopicQuery {
-    topic: String,
+    channel_id: String,
 }
 
 #[allow(clippy::unused_async)]
@@ -42,7 +43,8 @@ async fn challenge(
     Extension(registry): Extension<Arc<RwLock<Registry>>>,
 ) -> Result<String, ChallengeError> {
     let channel_id =
-        serde_urlencoded::from_str::<TopicQuery>(query.topic.query().unwrap_or_default())?.topic;
+        serde_urlencoded::from_str::<TopicQuery>(query.topic.query().unwrap_or_default())?
+            .channel_id;
     let has_task = registry.read().contains_channel(&channel_id);
     let mode = query.mode;
     if (mode == Mode::Subscribe && has_task) || (mode == Mode::Unsubscribe && !has_task) {
@@ -70,8 +72,13 @@ impl IntoResponse for EventError {
 }
 
 #[allow(clippy::unused_async)]
-async fn event(Extension(_registry): Extension<Arc<RwLock<Registry>>>) -> Result<(), EventError> {
-    todo!()
+async fn event(
+    Extension(_registry): Extension<Arc<RwLock<Registry>>>,
+    feed: Xml<Feed>,
+) -> Result<(), EventError> {
+    eprintln!("Event received.");
+    eprintln!("{:?}", feed);
+    Ok(())
 }
 
 pub async fn serve(
