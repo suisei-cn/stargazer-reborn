@@ -1,23 +1,17 @@
-use std::sync::Arc;
-
 use axum::response::{IntoResponse, Response as AxumResponse};
+use futures::{future::try_join, TryStreamExt};
 use sg_core::models::User;
 
 use crate::{
     rpc::{
-        models::{GetUser, GetUserSettings, Requests, UserSettings},
+        models::{Entities, GetEntities, GetUser, Requests},
         ApiError, Response,
     },
-    server::DB,
+    server::Context,
 };
 
-#[derive(Debug, Clone)]
-pub struct Context {
-    pub db: Arc<DB>,
-}
-
 macro_rules! dispatch {
-    ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: ident),* ) => {
+    ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: ident $(,)? )* ) => {
         match $self {
             $(
                 Requests::$req_variant(req) => match $fn(req, $ctx.clone()).await {
@@ -25,7 +19,7 @@ macro_rules! dispatch {
                     Err(e) => e.packed().into_response(),
                 }
             )*
-            Self::Unknown => ApiError::unknown_method().packed().into_response(),
+            Self::Unknown => ApiError::bad_request("Bad method or request body").packed().into_response(),
             #[allow(unreachable_patterns)]
             _ => {
                 tracing::log::warn!("Method not implemented");
@@ -40,15 +34,27 @@ impl Requests {
         dispatch![
             self, ctx,
             GetUser => get_user,
-            GetUserSettings => get_user_settings
+            GetEntities => get_entities,
         ]
     }
 }
 
-async fn get_user(req: GetUser, _ctx: Context) -> Result<User, ApiError> {
-    todo!()
+async fn get_user(req: GetUser, ctx: Context) -> Result<User, ApiError> {
+    let id = req.user_id.as_str();
+    ctx.users()
+        .find_one(mongodb::bson::doc! { "id": id }, None)
+        .await?
+        .ok_or_else(|| ApiError::user_not_found(id))
 }
 
-async fn get_user_settings(req: GetUserSettings, _ctx: Context) -> Result<UserSettings, ApiError> {
-    Ok(UserSettings::new())
+async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError> {
+    let (entities, groups) = try_join(
+        ctx.entities().find(None, None),
+        ctx.groups().find(None, None),
+    )
+    .await?;
+    let vtbs = entities.map_ok(Into::into).try_collect().await?;
+    let groups = groups.try_collect().await?;
+
+    Ok(Entities { vtbs, groups })
 }
