@@ -3,14 +3,17 @@
 use color_eyre::Result;
 use mongodb::{Client, Collection};
 
-use sg_core::models::InDB;
+use sg_core::models::{Entity, Group, Task, User};
 
-use crate::server::get_config;
+use crate::server::Config;
 
 #[derive(Debug, Clone)]
 /// Database instance.
 pub struct DB {
-    _collection: Collection<InDB<i32>>,
+    pub(crate) users: Collection<User>,
+    pub(crate) tasks: Collection<Task>,
+    pub(crate) entities: Collection<Entity>,
+    pub(crate) groups: Collection<Group>,
 }
 
 impl DB {
@@ -18,22 +21,19 @@ impl DB {
     ///
     /// # Errors
     /// Returns an error if the database connection fails.
-    pub async fn new() -> Result<DB> {
-        let config = get_config();
+    pub async fn new(config: &Config) -> Result<DB> {
         let client = Client::with_uri_str(&config.mongo_uri).await?;
         let db = client.database(&config.mongo_db);
-        let collection = db.collection(&config.mongo_collection);
+        let users = db.collection(&config.users_collection);
+        let tasks = db.collection(&config.tasks_collection);
+        let entities = db.collection(&config.entities_collection);
+        let groups = db.collection(&config.groups_collection);
 
         Ok(Self {
-            _collection: collection,
+            users,
+            tasks,
+            entities,
+            groups,
         })
-    }
-
-    pub async fn new_session() -> Result<()> {
-        Ok(())
-    }
-
-    pub async fn lookup_session(_session_id: String) -> Result<()> {
-        Ok(())
     }
 }
