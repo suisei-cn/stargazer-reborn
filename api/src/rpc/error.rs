@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::rpc::{Response, ResponseObject};
 
@@ -10,6 +11,14 @@ pub struct ApiError {
 impl axum::response::IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         self.packed().into_response()
+    }
+}
+
+impl From<mongodb::error::Error> for ApiError {
+    fn from(err: mongodb::error::Error) -> Self {
+        let err_str = err.to_string();
+        warn!(target: "mongo error", error = err_str.as_str());
+        ApiError::internal_error()
     }
 }
 
@@ -50,23 +59,19 @@ impl ApiError {
     }
 
     pub fn unauthorized() -> Self {
-        ApiError::new(vec!["Unauthorized".to_owned()])
+        Self::new(vec!["Unauthorized".to_owned()])
     }
 
-    pub fn unknown_method() -> Self {
-        ApiError::new(vec!["Unknown method".to_owned()])
-    }
-
-    pub fn user_not_found<'a>(user_id: impl Into<&'a str>) -> Self {
-        ApiError::new(vec![format!("User `{}` not found", user_id.into())])
+    pub fn user_not_found(user_id: &str) -> Self {
+        Self::new(vec![format!("User `{}` not found", user_id)])
     }
 
     pub fn bad_request(error: impl Into<String>) -> Self {
-        ApiError::new(vec!["Bad request".to_owned(), error.into()])
+        Self::new(vec!["Bad request".to_owned(), error.into()])
     }
 
     pub fn internal_error() -> Self {
-        ApiError::new(vec!["Internal Error".to_owned()])
+        Self::new(vec!["Internal Error".to_owned()])
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
 pub struct ResponseObject<T> {
     pub data: T,
     pub success: bool,
-    pub time: i64,
+    pub time: String,
 }
 
 impl<T> ResponseObject<T> {
@@ -23,7 +23,7 @@ impl<T> ResponseObject<T> {
 
     #[inline]
     #[must_use]
-    pub fn with_time(data: T, success: bool, time: i64) -> Self {
+    pub fn with_time(data: T, success: bool, time: String) -> Self {
         Self {
             data,
             success,
