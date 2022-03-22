@@ -4,7 +4,7 @@ use sg_core::models::User;
 
 use crate::{
     rpc::{
-        models::{Entities, GetEntities, GetUser, Requests},
+        models::{AuthMe, Entities, GetEntities, GetUser, Requests},
         ApiError, Response,
     },
     server::Context,
@@ -35,6 +35,7 @@ impl Requests {
             self, ctx,
             GetUser => get_user,
             GetEntities => get_entities,
+            AuthMe => auth_me
         ]
     }
 }
@@ -57,4 +58,16 @@ async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError
     let groups = groups.try_collect().await?;
 
     Ok(Entities { vtbs, groups })
+}
+
+async fn auth_me(req: AuthMe, ctx: Context) -> Result<User, ApiError> {
+    ctx.jwt.as_ref().api_validate(&req.token, &req.user_id)?;
+
+    let user = ctx
+        .users()
+        .find_one(mongodb::bson::doc! { "id": &req.user_id }, None)
+        .await?
+        .ok_or_else(|| ApiError::user_not_found(req.user_id.as_str()))?;
+
+    Ok(user)
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{extract::Extension, routing::post, Json, Router};
 use color_eyre::Result;
 
@@ -11,7 +13,8 @@ mod_use::mod_use![db, config, handler, jwt, context];
 pub async fn serve() -> Result<()> {
     let config = Config::from_env()?;
     let db = DB::new(&config).await?;
-    let ctx = Context { db };
+    let jwt = Arc::new(JWTContext::new(&config));
+    let ctx = Context { db, jwt };
 
     let server = Router::new()
         .route(

@@ -14,6 +14,13 @@ impl axum::response::IntoResponse for ApiError {
     }
 }
 
+impl From<jsonwebtoken::errors::Error> for ApiError {
+    fn from(e: jsonwebtoken::errors::Error) -> Self {
+        warn!("{}", e);
+        Self::bad_token()
+    }
+}
+
 impl From<mongodb::error::Error> for ApiError {
     fn from(err: mongodb::error::Error) -> Self {
         let err_str = err.to_string();
@@ -59,7 +66,17 @@ impl ApiError {
     }
 
     pub fn unauthorized() -> Self {
-        Self::new(vec!["Unauthorized".to_owned()])
+        Self::new(vec![
+            "Unauthorized".to_owned(),
+            "Token is valid but cannot be used with this user_id".to_owned(),
+        ])
+    }
+
+    pub fn bad_token() -> Self {
+        Self::new(vec![
+            "Bad token".to_owned(),
+            "It's either expired or in bad shape".to_owned(),
+        ])
     }
 
     pub fn user_not_found(user_id: &str) -> Self {
