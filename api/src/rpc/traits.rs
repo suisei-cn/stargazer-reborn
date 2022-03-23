@@ -2,7 +2,7 @@ use axum::response::IntoResponse;
 use color_eyre::{eyre::Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::rpc::ResponseObject;
+use crate::rpc::{RequestObject, ResponseObject};
 
 pub trait Request: DeserializeOwned {
     const METHOD: &'static str;
@@ -10,6 +10,13 @@ pub trait Request: DeserializeOwned {
 
     fn from_json(json: &str) -> Result<Self> {
         serde_json::from_str(json).wrap_err("Failed to parse json")
+    }
+
+    fn packed(self) -> RequestObject<Self> {
+        RequestObject {
+            method: Self::METHOD.to_owned(),
+            params: self,
+        }
     }
 }
 
