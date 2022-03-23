@@ -1,17 +1,36 @@
-use std::{fmt::Debug, result::Result as StdResult, time::Duration};
+use std::{
+    fmt::Debug,
+    result::Result as StdResult,
+    time::{Duration, SystemTime},
+};
 
 use color_eyre::{eyre::Context, Result};
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 
 use crate::{rpc::ApiError, server::Config};
 
-/// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     aud: String,
     exp: usize,
+}
+
+impl Claims {
+    /// This method will no validate exp since by default it has been validated by jsonwebtoken.
+    pub fn validate(&self, user_id: &uuid::Uuid) -> bool {
+        self.aud.as_bytes().eq(user_id.as_bytes())
+    }
+
+    /// The `exp` of the token in [`SystemTime`].
+    pub fn valid_until(&self) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(self.exp as u64)
+    }
+
+    /// Expiration time of the token in UNIX timestamp.
+    pub fn exp(&self) -> usize {
+        self.exp
+    }
 }
 
 #[derive(Clone)]
@@ -38,36 +57,42 @@ impl JWTContext {
         }
     }
 
-    fn exp(&self) -> usize {
-        (OffsetDateTime::now_utc() + self.timeout)
-            .unix_timestamp()
-            .try_into()
-            .expect("Proper timestamp cannot be negative")
+    fn valid_until(&self) -> usize {
+        (SystemTime::now() + self.timeout)
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as usize
     }
 
-    pub fn encode(&self, user_id: impl Into<String>) -> Result<String> {
+    pub fn encode(&self, user_id: &uuid::Uuid) -> Result<(String, Claims)> {
         let claim = Claims {
-            aud: user_id.into(),
-            exp: self.exp(),
+            aud: user_id.to_string(),
+            exp: self.valid_until(),
         };
-        jsonwebtoken::encode(&self.header, &claim, &self.encode_key)
-            .wrap_err("Failed to encode JWT")
+        let token = jsonwebtoken::encode(&self.header, &claim, &self.encode_key)
+            .wrap_err("Failed to encode JWT")?;
+
+        Ok((token, claim))
+    }
+
+    pub fn decode(
+        &self,
+        token: impl AsRef<str>,
+    ) -> Result<TokenData<Claims>, jsonwebtoken::errors::Error> {
+        jsonwebtoken::decode::<Claims>(token.as_ref(), &self.decode_key, &self.val)
     }
 
     pub fn validate(
         &self,
         token: &str,
-        user_id: &str,
+        user_id: &uuid::Uuid,
     ) -> std::result::Result<bool, jsonwebtoken::errors::Error> {
-        let ret = jsonwebtoken::decode::<Claims>(token, &self.decode_key, &self.val)?
-            .claims
-            .aud
-            .eq(user_id);
+        let ret = self.decode(token)?.claims.validate(user_id);
 
         Ok(ret)
     }
 
-    pub fn api_validate(&self, token: &str, user_id: &str) -> StdResult<(), ApiError> {
+    pub fn api_validate(&self, token: &str, user_id: &uuid::Uuid) -> StdResult<(), ApiError> {
         match self.validate(token, user_id) {
             Ok(true) => Ok(()),
             Ok(false) => Err(ApiError::bad_token()),
@@ -90,7 +115,7 @@ impl Debug for JWTContext {
 
 #[test]
 fn test_jwt() {
-    let user_id = "Test";
+    let user_id = "20bdc51a-a23e-4f38-bbff-739d2b8ded4d".parse().unwrap();
 
     let config = Config {
         bot_password: "Secret".to_string(),
@@ -103,14 +128,14 @@ fn test_jwt() {
 
     println!("{:#?}", jwt);
 
-    let token = jwt.encode(user_id).unwrap();
+    let (token, _) = jwt.encode(&user_id).unwrap();
     println!("{}", token);
 
     // Valid and not expired
-    assert!(jwt.validate(&token, user_id).unwrap());
+    assert!(jwt.validate(&token, &user_id).unwrap());
 
     std::thread::sleep(Duration::from_secs(2));
 
     // Valid but expired
-    assert!(jwt.validate(&token, user_id).is_err());
+    assert!(jwt.validate(&token, &user_id).is_err());
 }
