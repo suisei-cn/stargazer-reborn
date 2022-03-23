@@ -1,28 +1,39 @@
-use axum::response::{IntoResponse, Response as AxumResponse};
-use futures::{future::try_join, TryStreamExt};
-use sg_core::models::User;
-
 use crate::{
     rpc::{
-        models::{AuthMe, Entities, GetEntities, GetUser, Requests},
+        models::{
+            AddUser, AuthUser, Authorized, DelUser, Entities, GetEntities, GetUser, NewSession,
+            Null, Requests, Session,
+        },
         ApiError, Response,
     },
     server::Context,
 };
 
+use axum::response::{IntoResponse, Response as AxumResponse};
+use futures::{future::try_join, TryStreamExt};
+use mongodb::bson::doc;
+use sg_core::models::{EventFilter, User};
+
 macro_rules! dispatch {
-    ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: ident $(,)? )* ) => {
+    ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: expr $(,)? )* ) => {
         match $self {
             $(
-                Requests::$req_variant(req) => match $fn(req, $ctx.clone()).await {
-                    Ok(res) => res.packed().into_response(),
-                    Err(e) => e.packed().into_response(),
+                Requests::$req_variant(req) => {
+                    ::tracing::debug!(
+                        method = stringify!($req_variant),
+                        params = ?req,
+                        "Received request"
+                    );
+                    match $fn(req, $ctx).await {
+                        Ok(res) => res.packed().into_response(),
+                        Err(e) => e.packed().into_response(),
+                    }
                 }
             )*
-            Self::Unknown => ApiError::bad_request("Bad method or request body").packed().into_response(),
+            Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
             #[allow(unreachable_patterns)]
             _ => {
-                tracing::log::warn!("Method not implemented");
+                tracing::warn!("Method not implemented");
                 ApiError::internal_error().into_response()
             },
         }
@@ -30,22 +41,20 @@ macro_rules! dispatch {
 }
 
 impl Requests {
+    /// Dispatch the request to the appropriate handler.
+    ///
+    /// Unimplemented methods will return an internal error and log a warn.
     pub async fn handle(self, ctx: Context) -> AxumResponse {
         dispatch![
             self, ctx,
-            GetUser => get_user,
+            GetUser => |req: GetUser, ctx: Context| async move { ctx.find_user(&req.user_id).await },
             GetEntities => get_entities,
-            AuthMe => auth_me
+            AddUser => add_user,
+            AuthUser => auth_user,
+            DelUser => del_user,
+            NewSession => new_session,
         ]
     }
-}
-
-async fn get_user(req: GetUser, ctx: Context) -> Result<User, ApiError> {
-    let id = req.user_id.as_str();
-    ctx.users()
-        .find_one(mongodb::bson::doc! { "id": id }, None)
-        .await?
-        .ok_or_else(|| ApiError::user_not_found(id))
 }
 
 async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError> {
@@ -60,14 +69,76 @@ async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError
     Ok(Entities { vtbs, groups })
 }
 
-async fn auth_me(req: AuthMe, ctx: Context) -> Result<User, ApiError> {
-    ctx.jwt.as_ref().api_validate(&req.token, &req.user_id)?;
+async fn add_user(req: AddUser, ctx: Context) -> Result<User, ApiError> {
+    let AddUser {
+        im,
+        avatar,
+        password,
+        name,
+    } = req;
 
-    let user = ctx
-        .users()
-        .find_one(mongodb::bson::doc! { "id": &req.user_id }, None)
-        .await?
-        .ok_or_else(|| ApiError::user_not_found(req.user_id.as_str()))?;
+    ctx.auth_password(password)?;
+
+    let user = User {
+        im,
+        avatar,
+        name,
+        event_filter: EventFilter {
+            entities: Default::default(),
+            kinds: Default::default(),
+        },
+        id: Default::default(),
+    };
+
+    ctx.users().insert_one(&user, None).await?;
 
     Ok(user)
+}
+
+async fn del_user(req: DelUser, ctx: Context) -> Result<Null, ApiError> {
+    let DelUser { password, user_id } = req;
+
+    ctx.auth_password(password)?;
+    ctx.find_user(&user_id).await?;
+    ctx.users().delete_one(doc! { "id": user_id }, None).await?;
+
+    Ok(Null)
+}
+
+async fn auth_user(req: AuthUser, ctx: Context) -> Result<Authorized, ApiError> {
+    let AuthUser { user_id, token } = &req;
+
+    let claims = ctx.jwt.decode(token)?.claims;
+    if !claims.validate(user_id) {
+        return Err(ApiError::unauthorized());
+    }
+
+    let user = ctx.find_user(user_id).await?;
+
+    Ok(Authorized {
+        user,
+        valid_until: claims.valid_until(),
+    })
+}
+
+async fn new_session(req: NewSession, ctx: Context) -> Result<Session, ApiError> {
+    let NewSession { user_id, password } = &req;
+
+    ctx.auth_password(password)?;
+
+    // make sure user exists
+    ctx.find_user(user_id).await?;
+
+    let (token, claim) = match ctx.jwt.encode(user_id) {
+        Ok(token) => token,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to generate token");
+            return Err(ApiError::internal_error());
+        }
+    };
+
+    Ok(Session {
+        token,
+        valid_until: claim.valid_until(),
+    })
 }
