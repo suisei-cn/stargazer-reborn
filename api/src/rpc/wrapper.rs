@@ -1,6 +1,5 @@
 use axum::{http::StatusCode, response::Response as AxumResponse, Json};
 use serde::{Deserialize, Serialize};
-use tracing::log::error;
 
 use crate::{
     rpc::{ApiError, Response},
@@ -8,6 +7,33 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[must_use]
+pub struct RequestObject<T> {
+    pub method: String,
+    pub params: T,
+}
+
+impl<T: Serialize> RequestObject<T> {
+    pub fn new(method: &str, params: T) -> Self {
+        Self {
+            method: method.to_string(),
+            params,
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        match serde_json::to_string(&self) {
+            Ok(res) => res,
+            Err(err) => {
+                tracing::error!("Failed to serialize response object: {}", err);
+                ApiError::internal_error().packed().to_json()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[must_use]
 pub struct ResponseObject<T> {
     pub data: T,
     pub success: bool,
@@ -16,13 +42,11 @@ pub struct ResponseObject<T> {
 
 impl<T> ResponseObject<T> {
     #[inline]
-    #[must_use]
     pub fn new(data: T, success: bool) -> Self {
         Self::with_time(data, success, timestamp())
     }
 
     #[inline]
-    #[must_use]
     pub fn with_time(data: T, success: bool, time: String) -> Self {
         Self {
             data,
@@ -32,15 +56,23 @@ impl<T> ResponseObject<T> {
     }
 
     #[inline]
-    #[must_use]
     pub fn success(data: T) -> Self {
         Self::new(data, true)
     }
 
     #[inline]
-    #[must_use]
     pub fn error(data: T) -> Self {
         Self::new(data, false)
+    }
+
+    #[inline]
+    pub fn is_success(&self) -> bool {
+        self.success
+    }
+
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        !self.success
     }
 }
 
@@ -50,7 +82,7 @@ impl<T: Serialize> ResponseObject<T> {
         match serde_json::to_string(&self) {
             Ok(res) => res,
             Err(err) => {
-                error!("Failed to serialize response object: {}", err);
+                tracing::error!("Failed to serialize response object: {}", err);
                 ApiError::internal_error().packed().to_json()
             }
         }
