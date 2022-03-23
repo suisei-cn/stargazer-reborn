@@ -10,20 +10,24 @@ sg-core = { package = "core", path = "../core" }
 
 url                = "2.2.2"
 axum               = "0.4.8"
-tracing            = "0.1"
+tracing            = "0.1.32"
 futures            = "0.3.21"
-mod_use            = "0.2"
-color-eyre         = "0.6"
+mod_use            = "0.2.0"
+color-eyre         = "0.6.1"
 serde_json         = "1.0.79"
-humantime-serde    = "1.0.1"
-tracing-subscriber = "0.3"
+jsonwebtoken       = "8.0.1"
+humantime-serde    = "1.1.1"
+tracing-subscriber = "0.3.9"
 uuid               = { version = "0.8.2", features = ["serde"] }
-serde              = { version = "1.0", features = ["derive"] }
+serde              = { version = "1.0.136", features = ["derive"] }
 figment            = { version = "0.10.6", features = ["env"] }
-isolanguage-1      = { version = "0.2", features = ["serde"] }
-tokio              = { version = "1.17", features = ["rt", "rt-multi-thread", "time", "macros"] }
-mongodb            = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc", features = ["bson-uuid-0_8"] }
-jsonwebtoken = "8.0.1"
+isolanguage-1      = { version = "0.2.2", features = ["serde"] }
+tokio              = { version = "1.17.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
+mongodb            = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc" }
 
 [dev-dependencies]
-figment = { version = "0.10", features = ["test"] }
+figment   = { version = "0.10.6", features = ["test"] }
+reqwest   = { version = "0.11.10", features = ["blocking"] }
+once_cell = "1.10.0"
+
+[features]

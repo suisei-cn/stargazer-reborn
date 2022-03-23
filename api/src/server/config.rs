@@ -47,7 +47,7 @@ impl Config {
 /// API config defaults.
 ///
 /// **THIS SHOULD NOT BE USED IN PRODUCTION**,
-/// use [`Config::from_env()`] and pass in custom value from environment instead.
+/// use [`Config::from_env`] and pass in custom value from environment instead.
 impl Default for Config {
     fn default() -> Self {
         Self {
