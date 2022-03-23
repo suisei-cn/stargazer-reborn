@@ -80,17 +80,18 @@ pub mod models;
 /// ```
 macro_rules! methods {
     ($(
+        $( #[ $method_meta:meta ] )*
         $method:literal :=
         $req:ident {
             $(
-                $( #[ $req_m:meta ] )?
+                $( #[ $req_field_meta:meta ] )*
                 $req_field_name:ident : $req_field_type:ty $(,)?
             )*
         }
         ->
         $resp:ident $({
             $(
-                $( #[ $res_m:meta ] )?
+                $( #[ $res_field_meta:meta ] )*
                 $resp_field_name:ident : $resp_field_type:ty $(,)?
             )*
         })?
@@ -98,9 +99,10 @@ macro_rules! methods {
     )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+            $( #[ $method_meta ] )*
             pub struct $req {
                 $(
-                    $( #[ $req_m ] )?
+                    $( #[ $req_field_meta ] )*
                     pub $req_field_name : $req_field_type,
                 )*
             }
@@ -124,7 +126,7 @@ macro_rules! methods {
                 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
                 pub struct $resp {
                     $(
-                        $( #[ $res_m ] )?
+                        $( #[ $res_field_meta ] )*
                         pub $resp_field_name : $resp_field_type,
                     )*
                 }
