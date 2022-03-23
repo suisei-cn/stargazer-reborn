@@ -1,8 +1,9 @@
+//! Contains all model definition and trait implementations.
+
 use std::time::SystemTime;
 
 use sg_core::models::{Entity, EventFilter, Group, Meta, User};
 use url::Url;
-use uuid::Uuid;
 
 use crate::rpc::Response;
 
@@ -14,7 +15,7 @@ impl Response for User {
 
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 pub struct Vtb {
-    pub id: Uuid,
+    pub id: uuid::Uuid,
     #[serde(flatten)]
     pub meta: Meta,
 }
@@ -32,9 +33,9 @@ impl From<Entity> for Vtb {
 /// Usually be used to indictate the operation is successful but nothing to return.
 /// Similar to HTTP Code 204.
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
-pub struct NullResponse {}
+pub struct Null;
 
-impl Response for NullResponse {
+impl Response for Null {
     fn is_successful(&self) -> bool {
         true
     }
@@ -45,21 +46,27 @@ crate::methods! {
     // Does not require Token //
     // ---------------------- //
 
+    /// Get the user information.
     "getUser" := GetUser {
-        user_id: String
+        user_id: uuid::Uuid
     } -> User,
 
+    /// Get all entities, include vtbs and groups
     "getEntities" := GetEntities {} -> Entities {
         vtbs: Vec<Vtb>,
         groups: Vec<Group>
     },
 
-    // -------------- //
-    // Requires Token //
-    // -------------- //
+    // ---------------------- //
+    // Does requires Password //
+    // ---------------------- //
 
+    /// Create a new session for user. This method should only be used by bots.
+    ///
+    /// **TODO**: `password` should be replaced by a more secure way in future.
     "newSession" := NewSession {
-        user_id: String,
+        user_id: uuid::Uuid,
+        // Bot password
         password: String
     } -> Session {
         token: String,
@@ -67,28 +74,45 @@ crate::methods! {
         valid_until: SystemTime
     }
 
-    "delUser" := DelUser {
-        token: String,
-        user_id: String
-    } -> NullResponse,
-
+    /// Create a new user. This method should only be used by bots.
+    ///
+    /// **TODO**: `password` should be replaced by a more secure way in future.
     "addUser" := AddUser {
         // The IM that the user is in.
         im: String,
         // Avatar of the user.
         avatar: Url,
-        token: String,
+        // Bot password
+        password: String,
+        // Name of the user.
         name: String
     } -> User,
 
+    /// Delete an existing user. This method should only be used by bots.
+    ///
+    /// **TODO**: `password` should be replaced by a more secure way in future.
+    "delUser" := DelUser {
+        user_id: uuid::Uuid
+        // Bot password
+        password: String,
+    } -> Null,
+
+    // -------------- //
+    // Requires Token //
+    // -------------- //
+
     "updateUserSetting" := UpdateUserSetting {
-        user_id: String,
+        user_id: uuid::Uuid,
         token: String,
         event_filter: EventFilter
     } -> User,
 
-    "authMe" := AuthMe {
-        user_id: String,
+    "authUser" := AuthUser {
+        user_id: uuid::Uuid,
         token: String
-    } -> User,
+    } -> Authorized {
+        user: User,
+        #[serde(with = "humantime_serde")]
+        valid_until: SystemTime
+    },
 }
