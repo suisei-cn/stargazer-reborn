@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
 use crate::rpc::{Response, ResponseObject};
 
@@ -16,7 +15,7 @@ impl axum::response::IntoResponse for ApiError {
 
 impl From<jsonwebtoken::errors::Error> for ApiError {
     fn from(e: jsonwebtoken::errors::Error) -> Self {
-        warn!("{}", e);
+        tracing::warn!("{}", e);
         Self::bad_token()
     }
 }
@@ -24,7 +23,7 @@ impl From<jsonwebtoken::errors::Error> for ApiError {
 impl From<mongodb::error::Error> for ApiError {
     fn from(err: mongodb::error::Error) -> Self {
         let err_str = err.to_string();
-        warn!(target: "mongo error", error = err_str.as_str());
+        tracing::error!(error = err_str.as_str(), "Mongo error");
         ApiError::internal_error()
     }
 }
@@ -65,13 +64,6 @@ impl ApiError {
         ResponseObject::error(self)
     }
 
-    pub fn unauthorized() -> Self {
-        Self::new(vec![
-            "Unauthorized".to_owned(),
-            "Token is valid but cannot be used with this user_id".to_owned(),
-        ])
-    }
-
     pub fn bad_token() -> Self {
         Self::new(vec![
             "Bad token".to_owned(),
@@ -79,8 +71,22 @@ impl ApiError {
         ])
     }
 
-    pub fn user_not_found(user_id: &str) -> Self {
-        Self::new(vec![format!("User `{}` not found", user_id)])
+    pub fn unauthorized() -> Self {
+        Self::new(vec![
+            "Unauthorized".to_owned(),
+            "Token is valid but cannot be used with this user_id".to_owned(),
+        ])
+    }
+
+    pub fn wrong_password() -> Self {
+        Self::new(vec!["Wrong password".to_owned()])
+    }
+
+    pub fn user_not_found(user_id: impl AsRef<str>) -> Self {
+        Self::new(vec![format!(
+            "Cannot find user with ID `{}`",
+            user_id.as_ref()
+        )])
     }
 
     pub fn bad_request(error: impl Into<String>) -> Self {
