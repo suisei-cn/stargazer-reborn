@@ -218,14 +218,14 @@ mod test_macro {
     }
 
     #[test]
-    fn test_serialize_error() {
+    fn test_serialize_api_error() {
         let now = timestamp();
+        let id = "26721d57-37f5-458c-afea-2b18baf34925";
         let resp = format!(
-            r#"{{"data":{{"error":["User `foo` not found"]}},"success":false,"time":"{}"}}"#,
-            now
+            r#"{{"data":{{"error":["Cannot find user with ID `{id}`"]}},"success":false,"time":"{now}"}}"#,
         );
 
-        let mut resp_obj = ApiError::user_not_found("foo").packed();
+        let mut resp_obj = ApiError::user_not_found(&id.parse().unwrap()).packed();
         resp_obj.time = now;
 
         assert_eq!(resp, resp_obj.to_json());

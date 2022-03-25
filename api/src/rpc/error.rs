@@ -84,11 +84,7 @@ impl ApiError {
         Self::new(vec!["Wrong password".to_owned()])
     }
 
-    pub fn user_not_found(user_id: impl AsRef<str>) -> Self {
-        Self::new(vec![format!(
-            "Cannot find user with ID `{}`",
-            user_id.as_ref()
-        )])
+        Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
     }
 
     pub fn bad_request(error: impl Into<String>) -> Self {
