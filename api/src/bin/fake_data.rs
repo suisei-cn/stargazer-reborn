@@ -59,17 +59,17 @@
 //! [1600] 105.987ms / 118.933ms / 96.213ms
 //! ```
 
-use std::env;
+use std::{collections::HashMap, env};
 
 use color_eyre::Result;
-use fake::{faker::name::en::Name, Fake, Faker};
+use fake::{faker::name::en::Name as FakeName, Fake, Faker};
 use futures::StreamExt;
 use mongodb::{bson::doc, Collection};
 use rand::{
     prelude::{SliceRandom, ThreadRng},
     thread_rng, Rng,
 };
-use sg_core::models::{EventFilter, User};
+use sg_core::models::{Entity, EventFilter, Meta, Name, User};
 use tokio::time::Instant;
 
 const KINDS: &[&str] = &[
@@ -90,10 +90,26 @@ fn gen_user(event_filter: EventFilter) -> User {
 
     User {
         id: id.into(),
-        name: Name().fake(),
+        name: FakeName().fake(),
         event_filter,
         avatar: "http://placekitten.com/114/514".parse().unwrap(),
         im: ["tg", "qq"].choose(&mut rng).unwrap().to_owned().to_owned(),
+        is_admin: false,
+    }
+}
+
+fn gen_entity() -> Entity {
+    let en = isolanguage_1::LanguageCode::En;
+    let id: uuid::Uuid = Faker.fake();
+    let name = Name {
+        name: HashMap::from_iter([(en, FakeName().fake())]),
+        default_language: en,
+    };
+    let meta = Meta { name, group: None };
+    Entity {
+        id: id.into(),
+        meta,
+        tasks: vec![],
     }
 }
 
@@ -120,7 +136,9 @@ async fn main() -> Result<()> {
     let db = client.database("stargazer-reborn");
     let users = db.collection::<User>("users");
 
-    for count in (10..=400).step_by(10).chain((600..=1600).step_by(200)) {
+    // for count in (10..=400).step_by(10).chain((600..=1600).step_by(200)) {
+    {
+        let count = 100;
         let stat = get_avg_time_with_user_count(users.clone(), count).await?;
         let avg = stat.iter().sum::<u64>() as f64 / (10.0 * 1000.0);
         let max = *stat.iter().max().unwrap() as f64 / 1000.0;
@@ -141,14 +159,16 @@ async fn get_avg_time_with_user_count(
 
     let entities: [uuid::Uuid; 32] = Faker.fake();
 
-    users
-        .insert_many(
-            (0..user_count)
-                .map(|_| gen_user(gen_ef(&mut rng, entities.as_slice())))
-                .collect::<Vec<_>>(),
-            None,
-        )
-        .await?;
+    let mut data: Vec<User> = (0..user_count)
+        .map(|_| gen_user(gen_ef(&mut rng, entities.as_slice())))
+        .collect();
+
+    let lucky_one = data.choose_mut(&mut rng).unwrap();
+    lucky_one.is_admin = true;
+
+    tracing::info!(id = %lucky_one.id, "Admin");
+
+    users.insert_many(data, None).await?;
 
     let mut stat = vec![];
 
