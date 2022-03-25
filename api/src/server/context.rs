@@ -5,8 +5,8 @@ use mongodb::{bson::doc, Collection};
 use sg_core::models::{Entity, Group, Task, User};
 
 use crate::{
-    rpc::ApiError,
-    server::{config::Config, JWTContext, DB},
+    rpc::{ApiError, ApiResult},
+    server::{config::Config, Claims, JWTContext, ValidateResult, DB},
 };
 
 #[derive(Debug, Clone)]
@@ -41,9 +41,9 @@ impl Context {
 
     pub async fn find_user(&self, id: &uuid::Uuid) -> Result<User, ApiError> {
         self.users()
-            .find_one(doc! { "id": &id }, None)
+            .find_one(doc! { "id": id }, None)
             .await?
-            .ok_or_else(|| ApiError::user_not_found(id.to_string()))
+            .ok_or_else(|| ApiError::user_not_found(id))
     }
 
     pub fn auth_password(&self, password: impl AsRef<str>) -> Result<(), ApiError> {
@@ -51,6 +51,21 @@ impl Context {
             Err(ApiError::wrong_password())
         } else {
             Ok(())
+        }
+    }
+
+    pub fn validate_token(
+        &self,
+        token: impl AsRef<str>,
+        user_id: &uuid::Uuid,
+    ) -> ApiResult<Claims> {
+        match self.jwt.validate(token, user_id) {
+            Ok(ValidateResult {
+                valid: true,
+                claims,
+            }) => Ok(claims),
+            Ok(ValidateResult { valid: false, .. }) => Err(ApiError::bad_token()),
+            Err(e) => Err(e.into()),
         }
     }
 }

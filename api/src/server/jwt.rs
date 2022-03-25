@@ -84,20 +84,15 @@ impl JWTContext {
 
     pub fn validate(
         &self,
-        token: &str,
+        token: impl AsRef<str>,
         user_id: &uuid::Uuid,
-    ) -> std::result::Result<bool, jsonwebtoken::errors::Error> {
-        let ret = self.decode(token)?.claims.validate(user_id);
+    ) -> jsonwebtoken::errors::Result<ValidateResult> {
+        let claims = self.decode(token)?.claims;
 
-        Ok(ret)
-    }
-
-    pub fn api_validate(&self, token: &str, user_id: &uuid::Uuid) -> StdResult<(), ApiError> {
-        match self.validate(token, user_id) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(ApiError::bad_token()),
-            Err(e) => Err(e.into()),
-        }
+        Ok(ValidateResult {
+            valid: claims.validate(user_id),
+            claims,
+        })
     }
 }
 
