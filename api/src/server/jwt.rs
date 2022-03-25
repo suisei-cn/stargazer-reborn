@@ -27,7 +27,7 @@ pub struct ValidateResult {
 impl Claims {
     /// This method will no validate exp since by default it has been validated by jsonwebtoken.
     pub fn validate(&self, user_id: &uuid::Uuid) -> bool {
-        self.aud.as_bytes().eq(user_id.as_bytes())
+        &self.aud == user_id.as_bytes()
     }
 
     /// The `exp` of the token in [`SystemTime`].
