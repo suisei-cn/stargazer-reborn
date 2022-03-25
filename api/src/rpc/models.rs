@@ -1,6 +1,9 @@
 //! Contains all model definition and trait implementations.
 
-use std::time::SystemTime;
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 
 use sg_core::models::{Entity, EventFilter, Group, Meta, User};
 use url::Url;
@@ -105,7 +108,7 @@ crate::methods! {
         user_id: uuid::Uuid,
         token: String,
         event_filter: EventFilter
-    } -> User,
+    } -> Null,
 
     "authUser" := AuthUser {
         user_id: uuid::Uuid,
