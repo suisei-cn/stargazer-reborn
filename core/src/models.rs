@@ -18,7 +18,7 @@ pub struct Entity {
     /// Metadata about the entity.
     pub meta: Meta,
     /// Tasks to be scheduled.
-    pub tasks: Vec<Task>,
+    pub tasks: Vec<Uuid>,
 }
 
 /// Meta of the vtuber.
