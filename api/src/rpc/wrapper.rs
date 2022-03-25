@@ -1,3 +1,7 @@
+//! Wrapper for RPC calls. Includes wrapper for [`Request`](crate::rpc::Request) types and [`Response`] types.
+
+use std::ops::{Deref, DerefMut};
+
 use axum::{http::StatusCode, response::Response as AxumResponse, Json};
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +33,20 @@ impl<T: Serialize> RequestObject<T> {
                 ApiError::internal_error().packed().to_json()
             }
         }
+    }
+}
+
+impl<T> Deref for RequestObject<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.params
+    }
+}
+
+impl<T> DerefMut for RequestObject<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.params
     }
 }
 
@@ -93,6 +111,20 @@ impl<'a, T: Deserialize<'a>> ResponseObject<T> {
     #[inline]
     pub fn try_from_json(json: &'a str) -> serde_json::error::Result<T> {
         serde_json::from_str(json)
+    }
+}
+
+impl<T> Deref for ResponseObject<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<T> DerefMut for ResponseObject<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
     }
 }
 

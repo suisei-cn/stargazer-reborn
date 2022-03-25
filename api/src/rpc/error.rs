@@ -84,6 +84,7 @@ impl ApiError {
         Self::new(vec!["Wrong password".to_owned()])
     }
 
+    pub fn user_not_found(user_id: &uuid::Uuid) -> Self {
         Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
     }
 
@@ -95,6 +96,8 @@ impl ApiError {
         Self::new(vec!["Internal Error".to_owned()])
     }
 }
+
+pub type ApiResult<T> = Result<T, ApiError>;
 
 impl Response for ApiError {
     fn is_successful(&self) -> bool {

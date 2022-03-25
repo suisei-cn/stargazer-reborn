@@ -12,8 +12,9 @@ mod test;
 mod_use::mod_use![db, config, handler, jwt, context];
 
 pub async fn serve_with_config(config: Config) -> Result<()> {
-    let config = Arc::new(config);
     tracing::debug!(config = ?config);
+
+    let server = axum::Server::bind(&config.bind);
     let db = DB::new(&config).await?;
     let jwt = Arc::new(JWTContext::new(&config));
 

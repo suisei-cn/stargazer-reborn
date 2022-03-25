@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// Bind address for API server.
     pub bind: SocketAddr,
-    /// Duration til session is timed out.
+    /// Duration the session(token) is valid.
     #[serde(with = "humantime_serde")]
-    pub session_timeout: Duration,
+    pub token_timeout: Duration,
     /// MongoDB connection string.
     pub mongo_uri: String,
     /// MongoDB database name.
@@ -52,7 +52,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             bind: "127.0.0.1:8000".parse().unwrap(),
-            session_timeout: Duration::from_secs(10 * 60),
+            token_timeout: Duration::from_secs(10 * 60),
             mongo_uri: String::from("mongodb://localhost:27017"),
             mongo_db: String::from("stargazer-reborn"),
             bot_password: String::from("TEST"),
@@ -96,7 +96,7 @@ mod tests {
                 Config::from_env().unwrap(),
                 Config {
                     bind: "0.0.0.0:8080".parse().unwrap(),
-                    session_timeout: Duration::from_secs(60 * 10),
+                    token_timeout: Duration::from_secs(60 * 10),
                     mongo_uri: String::from("mongodb://suichan:27017"),
                     mongo_db: String::from("db"),
                     bot_password: String::from("password"),
