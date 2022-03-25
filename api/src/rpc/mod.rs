@@ -62,7 +62,7 @@ pub mod models;
 /// # Example
 ///
 /// ```rust
-/// # use api::methods;
+/// # use api::methods; use sg_core::models::User;
 ///  methods! {
 ///     // If response object has fields, define it and implement `Response` for it.
 ///     "getUserSettings" := GetUserSettings {

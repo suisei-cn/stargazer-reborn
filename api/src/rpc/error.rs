@@ -34,10 +34,12 @@ impl From<mongodb::error::Error> for ApiError {
 /// ## Format into JSON
 /// ```rust
 /// # use api::rpc::ApiError; fn main() {
-/// let resp = r#"{"data":{"error":["User `foo` not found"]},"success":false,"time":0}"#;
+/// let resp = r#"{"data":{"error":["Cannot find user with ID `26721d57-37f5-458c-afea-2b18baf34925`"]},"success":false,"time":"2022-01-01T00:00:00.000000000Z"}"#;
 ///
-/// let mut resp_obj = ApiError::user_not_found("foo").packed();
-/// # resp_obj.time = 0;
+/// let mut resp_obj = ApiError::user_not_found(
+///     &"26721d57-37f5-458c-afea-2b18baf34925".parse().unwrap()
+/// ).packed();
+/// # resp_obj.time = "2022-01-01T00:00:00.000000000Z".to_owned();
 ///
 /// assert_eq!(resp, resp_obj.to_json());
 /// # }
