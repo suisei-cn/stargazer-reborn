@@ -1,6 +1,5 @@
 use std::{
     fmt::Debug,
-    result::Result as StdResult,
     time::{Duration, SystemTime},
 };
 
@@ -8,12 +7,21 @@ use color_eyre::{eyre::Context, Result};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::{rpc::ApiError, server::Config};
+use crate::server::Config;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// The JWT claim. Contains the user id and the expiry time.
 pub struct Claims {
-    aud: String,
+    /// Bytes representation of user id which can be decode and encoded into [`uuid::Uuid`].
+    aud: [u8; 16],
+    /// Expiration time represented in Unix timestamp.
     exp: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidateResult {
+    pub valid: bool,
+    pub claims: Claims,
 }
 
 impl Claims {
@@ -27,7 +35,7 @@ impl Claims {
         SystemTime::UNIX_EPOCH + Duration::from_secs(self.exp as u64)
     }
 
-    /// Expiration time of the token in UNIX timestamp.
+    /// Expiration time of the token in Unix timestamp.
     pub fn exp(&self) -> usize {
         self.exp
     }
@@ -51,7 +59,7 @@ impl JWTContext {
         Self {
             encode_key,
             decode_key,
-            timeout: config.session_timeout,
+            timeout: config.token_timeout,
             val: Validation::default(),
             header: Header::default(),
         }
@@ -66,7 +74,7 @@ impl JWTContext {
 
     pub fn encode(&self, user_id: &uuid::Uuid) -> Result<(String, Claims)> {
         let claim = Claims {
-            aud: user_id.to_string(),
+            aud: *user_id.as_bytes(),
             exp: self.valid_until(),
         };
         let token = jsonwebtoken::encode(&self.header, &claim, &self.encode_key)
@@ -110,11 +118,13 @@ impl Debug for JWTContext {
 
 #[test]
 fn test_jwt() {
-    let user_id = "20bdc51a-a23e-4f38-bbff-739d2b8ded4d".parse().unwrap();
+    let user_id = "20bdc51a-a23e-4f38-bbff-739d2b8ded4d"
+        .parse::<uuid::Uuid>()
+        .unwrap();
 
     let config = Config {
         bot_password: "Secret".to_string(),
-        session_timeout: Duration::from_secs(1),
+        token_timeout: Duration::from_secs(1),
         ..Default::default()
     };
 
@@ -127,7 +137,7 @@ fn test_jwt() {
     println!("{}", token);
 
     // Valid and not expired
-    assert!(jwt.validate(&token, &user_id).unwrap());
+    assert!(jwt.validate(&token, &user_id).unwrap().valid);
 
     std::thread::sleep(Duration::from_secs(2));
 
