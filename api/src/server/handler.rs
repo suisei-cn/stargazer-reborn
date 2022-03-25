@@ -53,11 +53,43 @@ impl Requests {
             AuthUser => auth_user,
             DelUser => del_user,
             NewSession => new_session,
+            UpdateUserSetting => update_user_setting,
         ]
     }
 }
 
-async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError> {
+async fn update_user_setting(req: UpdateUserSetting, ctx: Context) -> ApiResult<Null> {
+    let UpdateUserSetting {
+        user_id,
+        token,
+        event_filter,
+    } = req;
+
+    ctx.validate_token(&token, &user_id)?;
+
+    let serialized = mongodb::bson::to_bson(&event_filter)
+        .expect("reqs deserialized from JSON should be legal to be serialized again");
+
+    let res = ctx
+        .users()
+        .update_one(
+            doc! { "id": user_id },
+            doc! { "$set": { "event_filter": serialized } },
+            None,
+        )
+        .await?;
+
+    match res.matched_count {
+        1 => Ok(Null),
+        0 => Err(ApiError::user_not_found(&user_id)),
+        n => {
+            tracing::error!("One user_id mapped to {} users", n);
+            Ok(Null)
+        }
+    }
+}
+
+async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
     let (entities, groups) = try_join(
         ctx.entities().find(None, None),
         ctx.groups().find(None, None),
@@ -69,7 +101,7 @@ async fn get_entities(_: GetEntities, ctx: Context) -> Result<Entities, ApiError
     Ok(Entities { vtbs, groups })
 }
 
-async fn add_user(req: AddUser, ctx: Context) -> Result<User, ApiError> {
+async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
     let AddUser {
         im,
         avatar,
@@ -95,7 +127,7 @@ async fn add_user(req: AddUser, ctx: Context) -> Result<User, ApiError> {
     Ok(user)
 }
 
-async fn del_user(req: DelUser, ctx: Context) -> Result<Null, ApiError> {
+async fn del_user(req: DelUser, ctx: Context) -> ApiResult<Null> {
     let DelUser { password, user_id } = req;
 
     ctx.auth_password(password)?;
@@ -105,13 +137,10 @@ async fn del_user(req: DelUser, ctx: Context) -> Result<Null, ApiError> {
     Ok(Null)
 }
 
-async fn auth_user(req: AuthUser, ctx: Context) -> Result<Authorized, ApiError> {
+async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
     let AuthUser { user_id, token } = &req;
 
-    let claims = ctx.jwt.decode(token)?.claims;
-    if !claims.validate(user_id) {
-        return Err(ApiError::unauthorized());
-    }
+    let claims = ctx.validate_token(token, user_id)?;
 
     let user = ctx.find_user(user_id).await?;
 
@@ -121,7 +150,7 @@ async fn auth_user(req: AuthUser, ctx: Context) -> Result<Authorized, ApiError> 
     })
 }
 
-async fn new_session(req: NewSession, ctx: Context) -> Result<Session, ApiError> {
+async fn new_session(req: NewSession, ctx: Context) -> ApiResult<Session> {
     let NewSession { user_id, password } = &req;
 
     ctx.auth_password(password)?;
