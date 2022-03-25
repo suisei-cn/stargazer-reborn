@@ -24,6 +24,8 @@ figment            = { version = "0.10.6", features = ["env"] }
 isolanguage-1      = { version = "0.2.2", features = ["serde"] }
 tokio              = { version = "1.17.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
 mongodb            = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc" }
+fake               = { version = "2.4.3", features = ["uuid"], optional = true }
+rand = { version = "0.8.5", optional = true }
 
 [dev-dependencies]
 figment   = { version = "0.10.6", features = ["test"] }
@@ -31,3 +33,7 @@ reqwest   = { version = "0.11.10", features = ["blocking"] }
 once_cell = "1.10.0"
 
 [features]
+[[bin]]
+name = "fake"
+path = "src/bin/fake_data.rs"
+required-features = ["fake", "rand"]
