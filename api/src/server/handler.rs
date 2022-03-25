@@ -2,35 +2,61 @@ use crate::{
     rpc::{
         models::{
             AddUser, AuthUser, Authorized, DelUser, Entities, GetEntities, GetUser, NewSession,
-            Null, Requests, Session,
+            Null, Requests, Session, UpdateUserSetting,
         },
-        ApiError, Response,
+        ApiError, ApiResult, Request, Response,
     },
     server::Context,
 };
 
 use axum::response::{IntoResponse, Response as AxumResponse};
-use futures::{future::try_join, TryStreamExt};
+use futures::{
+    future::{try_join, BoxFuture},
+    Future, FutureExt, TryStreamExt,
+};
 use mongodb::bson::doc;
 use sg_core::models::{EventFilter, User};
 
+fn assert_method<T: Request, M: Method<T>>(_: &M) {}
+
+pub(crate) trait Method<Req: Request> {
+    fn handle(self, req: Req, context: Context) -> BoxFuture<'static, ApiResult<Req::Res>>;
+}
+
+impl<Req, M, F> Method<Req> for M
+where
+    Req: Request,
+    F: Future<Output = ApiResult<Req::Res>> + Send + 'static,
+    M: FnOnce(Req, Context) -> F,
+{
+    fn handle(self, req: Req, context: Context) -> BoxFuture<'static, ApiResult<Req::Res>> {
+        self(req, context).boxed()
+    }
+}
+
 macro_rules! dispatch {
-    ($self:ident, $ctx:ident, $( $req_variant: ident => $fn: expr $(,)? )* ) => {
+    ($self:ident, $ctx:ident, $( $req_variant: ident => $func: expr $(,)? )* ) => {
+
         match $self {
             $(
                 Requests::$req_variant(req) => {
                     ::tracing::debug!(
                         method = stringify!($req_variant),
                         params = ?req,
-                        "Received request"
+                        "Income request"
                     );
-                    match $fn(req, $ctx).await {
-                        Ok(res) => res.packed().into_response(),
+                    let func = $func;
+                    assert_method::<$req_variant, _>(&func);
+                    match func(req, $ctx).await {
+                        Ok(res) => {
+                            res.packed().into_response()
+                        },
                         Err(e) => e.packed().into_response(),
                     }
                 }
             )*
             Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
+            #[cfg(debug_assertions)]
             #[allow(unreachable_patterns)]
             _ => {
                 tracing::warn!("Method not implemented");
@@ -43,7 +69,11 @@ macro_rules! dispatch {
 impl Requests {
     /// Dispatch the request to the appropriate handler.
     ///
-    /// Unimplemented methods will return an internal error and log a warn.
+    /// # Unimplemented methods
+    /// Under debug mode, unimplemented methods will compile,
+    /// return an internal error and log a warning message during runtime.
+    ///
+    /// While in release mode, unimplemented methods will simply not compile.
     pub async fn handle(self, ctx: Context) -> AxumResponse {
         dispatch![
             self, ctx,
