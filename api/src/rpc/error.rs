@@ -77,6 +77,8 @@ impl ApiError {
         Self::new(vec![
             "Unauthorized".to_owned(),
             "Token is valid but cannot be used with this user_id".to_owned(),
+            "Either because it requires admin privilege or your token does not belongs to you"
+                .to_owned(),
         ])
     }
 
@@ -84,8 +86,12 @@ impl ApiError {
         Self::new(vec!["Wrong password".to_owned()])
     }
 
-    pub fn user_not_found(user_id: &uuid::Uuid) -> Self {
+    pub fn user_not_found(user_id: &mongodb::bson::Uuid) -> Self {
         Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
+    }
+
+    pub fn entity_not_found(entity_id: &mongodb::bson::Uuid) -> Self {
+        Self::new(vec![format!("Cannot find entity with ID `{}`", entity_id)])
     }
 
     pub fn bad_request(error: impl Into<String>) -> Self {
