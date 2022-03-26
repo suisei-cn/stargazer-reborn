@@ -324,6 +324,7 @@ async fn must_consistent_after_repeated_join() {
             .is_err(),
         "unable to join remote"
     );
+    assert!(!client.tasks.lock().unwrap().is_empty(), "no task received");
 
     // The worker group shouldn't be poisoned.
     server.worker_groups.lock().await["test"]
