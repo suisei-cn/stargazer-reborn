@@ -1,8 +1,8 @@
 use crate::{
     rpc::{
         models::{
-            AddUser, AuthUser, Authorized, DelUser, Entities, GetEntities, GetUser, NewSession,
-            Null, Requests, Session, UpdateUserSetting,
+            AddEntity, AddTask, AddUser, AuthUser, Authorized, DelUser, Entities, GetEntities,
+            NewSession, Null, Requests, Session, UpdateUserSetting,
         },
         ApiError, ApiResult, Request, Response,
     },
@@ -14,8 +14,8 @@ use futures::{
     future::{try_join, BoxFuture},
     Future, FutureExt, TryStreamExt,
 };
-use mongodb::bson::doc;
-use sg_core::models::{EventFilter, User};
+use mongodb::bson::{doc, Uuid};
+use sg_core::models::{self as m, Entity, EventFilter, Task, User};
 
 fn assert_method<T: Request, M: Method<T>>(_: &M) {}
 
@@ -55,11 +55,11 @@ macro_rules! dispatch {
                     }
                 }
             )*
-            Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
+        Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
             #[cfg(debug_assertions)]
             #[allow(unreachable_patterns)]
-            _ => {
-                tracing::warn!("Method not implemented");
+            n => {
+                tracing::warn!(method = ?n, "Method not implemented");
                 ApiError::internal_error().into_response()
             },
         }
@@ -77,9 +77,11 @@ impl Requests {
     pub async fn handle(self, ctx: Context) -> AxumResponse {
         dispatch![
             self, ctx,
-            GetUser => |req: GetUser, ctx: Context| async move { ctx.find_user(&req.user_id).await },
+            // GetUser => |req: GetUser, ctx: Context| async move { ctx.find_user(&req.user_id).await.map(Into::into) },
             GetEntities => get_entities,
             AddUser => add_user,
+            AddEntity => add_entity,
+            AddTask => add_task,
             AuthUser => auth_user,
             DelUser => del_user,
             NewSession => new_session,
@@ -88,14 +90,67 @@ impl Requests {
     }
 }
 
+async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
+    let AddEntity { meta, tasks, token } = req;
+
+    ctx.validate_token(token)?.assert_admin()?;
+
+    tracing::info!(meta = ?meta);
+
+    let mut ent = Entity {
+        id: Uuid::new(),
+        meta,
+        tasks: vec![],
+    };
+
+    ctx.entities().insert_one(&ent, None).await?;
+
+    let tasks = tasks
+        .into_iter()
+        .map(|x| x.into_task_with(ent.id))
+        .collect::<Vec<_>>();
+
+    ctx.tasks().insert_many(&tasks, None).await?;
+
+    ent.tasks = tasks.into_iter().map(|x| x.id).collect();
+
+    Ok(ent)
+}
+
+async fn add_task(req: AddTask, ctx: Context) -> ApiResult<Task> {
+    ctx.validate_token(&req.token)?.assert_admin()?;
+
+    let id = req.entity_id;
+    let task: Task = req.into();
+
+    ctx.tasks().insert_one(&task, None).await?;
+
+    let res = ctx
+        .entities()
+        .update_one(
+            doc! { "id": id },
+            doc! { "$push": { "tasks": task.id } },
+            None,
+        )
+        .await?;
+
+    match res.matched_count {
+        1 => Ok(task),
+        0 => Err(ApiError::entity_not_found(&id)),
+        n => {
+            tracing::error!("One entity_id mapped to {} entities", n);
+            Ok(task)
+        }
+    }
+}
+
 async fn update_user_setting(req: UpdateUserSetting, ctx: Context) -> ApiResult<Null> {
     let UpdateUserSetting {
-        user_id,
         token,
         event_filter,
     } = req;
 
-    ctx.validate_token(&token, &user_id)?;
+    let user_id = ctx.validate_token(&token)?.id();
 
     let serialized = mongodb::bson::to_bson(&event_filter)
         .expect("reqs deserialized from JSON should be legal to be serialized again");
@@ -141,10 +196,11 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
 
     ctx.auth_password(password)?;
 
-    let user = User {
+    let user = m::User {
         im,
         avatar,
         name,
+        is_admin: false,
         event_filter: EventFilter {
             entities: Default::default(),
             kinds: Default::default(),
@@ -167,12 +223,9 @@ async fn del_user(req: DelUser, ctx: Context) -> ApiResult<Null> {
     Ok(Null)
 }
 
-async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
-    let AuthUser { user_id, token } = &req;
-
-    let claims = ctx.validate_token(token, user_id)?;
-
-    let user = ctx.find_user(user_id).await?;
+async fn auth_user(AuthUser { token, user_id }: AuthUser, ctx: Context) -> ApiResult<Authorized> {
+    let claims = ctx.validate_token(&token)?;
+    let user = ctx.find_user(&user_id).await?;
 
     Ok(Authorized {
         user,
@@ -181,14 +234,17 @@ async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
 }
 
 async fn new_session(req: NewSession, ctx: Context) -> ApiResult<Session> {
-    let NewSession { user_id, password } = &req;
+    let NewSession {
+        ref user_id,
+        password,
+    } = req;
 
     ctx.auth_password(password)?;
 
     // make sure user exists
-    ctx.find_user(user_id).await?;
+    let user = ctx.find_user(user_id).await?;
 
-    let (token, claim) = match ctx.jwt.encode(user_id) {
+    let (token, claim) = match ctx.jwt.encode(user_id, user.is_admin) {
         Ok(token) => token,
         Err(e) => {
             tracing::error!(error = %e, "Failed to generate token");

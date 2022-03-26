@@ -1,45 +1,63 @@
-use crate::{
-    rpc::{
-        models::{AddUser, DelUser, GetEntities, GetUser, NewSession, UpdateUserSetting},
-        ApiError, ApiResult, Request, ResponseObject,
+use std::collections::{HashMap, HashSet};
+
+use crate::rpc::{
+    models::{
+        AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewSession,
+        Session, UpdateUserSetting,
     },
-    server::{serve_with_config, Config},
+    ApiError, ApiResult, Request, ResponseObject,
 };
 
-use std::{collections::HashSet, sync::Once, thread::available_parallelism, time::Duration};
-
 use color_eyre::{eyre::Context, Result};
+use isolanguage_1::LanguageCode;
+use mongodb::bson::Uuid;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sg_core::models::{EventFilter, User};
-use tracing::metadata::LevelFilter;
+use sg_core::models::{EventFilter, Meta, Name, User};
 
-static INITIATED: Once = Once::new();
+mod prep {
+    use std::{sync::Once, thread::available_parallelism, time::Duration};
 
-fn prep() {
-    INITIATED.call_once(|| {
-        tracing_subscriber::fmt()
-            .with_max_level(LevelFilter::INFO)
-            .init();
+    use tracing::metadata::LevelFilter;
 
-        tracing::info!("Initializing test suite");
+    use crate::server::{serve_with_config, Config};
 
-        color_eyre::install().unwrap();
+    static INIT: Once = Once::new();
 
-        // Spawn a server into background, which ideally will be destroyed when all tests are finished.
-        std::thread::spawn(|| {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(available_parallelism().unwrap().into())
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(serve_with_config(Config {
-                    bind: "127.0.0.1:8080".parse().unwrap(),
-                    token_timeout: Duration::from_secs(0),
-                    mongo_uri: "mongodb://192.168.1.53:27017".to_owned(),
-                    ..Default::default()
-                }))
+    pub fn prep() {
+        INIT.call_once(|| {
+            tracing_subscriber::fmt()
+                .with_max_level(LevelFilter::INFO)
+                .init();
+
+            tracing::info!("Initializing test suite");
+
+            color_eyre::install().unwrap();
+
+            // Spawn a server into background, which ideally will be destroyed when all tests are finished.
+            std::thread::spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(available_parallelism().unwrap().into())
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(serve_with_config(Config {
+                        bind: "127.0.0.1:8080".parse().unwrap(),
+                        token_timeout: Duration::from_secs(0),
+                        mongo_uri: "mongodb://192.168.1.53:27017".to_owned(),
+                        ..Default::default()
+                    }))
+            });
         });
-    });
+    }
+}
+
+use prep::prep;
+
+fn new_session(user_id: Uuid) -> Result<ApiResult<Session>> {
+    call(NewSession {
+        password: "TEST".to_owned(),
+        user_id,
+    })
 }
 
 fn call<R: Request + Serialize>(body: R) -> Result<ApiResult<R::Res>>
@@ -98,12 +116,14 @@ fn test_new_user() {
         im,
         name,
         avatar,
+        is_admin,
         event_filter,
     } = &res1;
 
     assert_eq!(im, "tg");
     assert_eq!(name, "Pop");
     assert_eq!(avatar.as_str(), "http://placekitten.com/114/514");
+    assert!(!is_admin);
     assert_eq!(
         event_filter,
         &EventFilter {
@@ -114,18 +134,21 @@ fn test_new_user() {
 
     tracing::info!(id = ?id, "New user added");
 
+    let token = new_session(*id).unwrap().unwrap().token;
+
     // Verify that the user is in the database
-    let req = GetUser {
-        user_id: id.to_owned().into(),
+    let req = AuthUser {
+        user_id: id.to_owned(),
+        token: token.clone(),
     };
 
-    let res2 = call(req).unwrap().unwrap();
+    let res2 = call(req).unwrap().unwrap().user;
 
     assert_eq!(res1, res2);
 
     // Delete the new user
     let req = DelUser {
-        user_id: id.to_owned().into(),
+        user_id: id.to_owned(),
         password: "TEST".to_owned(),
     };
 
@@ -133,8 +156,9 @@ fn test_new_user() {
     assert!(res);
 
     // Verify that the user is no longer in the database
-    assert!(call(GetUser {
-        user_id: id.to_owned().into(),
+    assert!(call(AuthUser {
+        user_id: id.to_owned(),
+        token
     })
     .unwrap()
     .is_err());
@@ -164,12 +188,26 @@ fn test_new_user_wrong_password() {
 fn test_get_entities() {
     prep();
 
-    let req = GetEntities {};
+    // let req = GetEntities {};
 
-    let res = call(req).unwrap();
+    // let res = call(req).unwrap().unwrap();
 
-    assert!(res.is_ok());
-    tracing::info!(entities = ?res);
+    // tracing::info!(entities = ?res);
+
+    let name = Name {
+        name: HashMap::from_iter([(LanguageCode::En, "Test".to_owned())]),
+        default_language: LanguageCode::En,
+    };
+
+    let meta = Meta { name, group: None };
+
+    let ser = serde_json::to_string(&meta).unwrap();
+
+    tracing::info!(ser = ser.as_str());
+
+    let de = serde_json::from_str(&ser).unwrap();
+
+    assert_eq!(meta, de);
 }
 
 #[test]
@@ -179,7 +217,7 @@ fn test_delete_nonexist_user() {
     let id = "eee29278-273e-4de9-a794-0a3de92f5c4b";
 
     let req = DelUser {
-        user_id: id.parse().unwrap(),
+        user_id: Uuid::parse_str(id).unwrap(),
         password: "TEST".to_owned(),
     };
 
@@ -202,26 +240,24 @@ fn test_update_user_settings() {
         name: "Pop".to_owned(),
     };
 
-    let User { id, .. } = call(user).unwrap().unwrap();
+    let user_id = call(user).unwrap().unwrap().id;
 
     let token = call(NewSession {
         password: "TEST".to_owned(),
-        user_id: id.into(),
+        user_id,
     })
     .unwrap()
     .unwrap()
     .token;
 
     let event_filter = EventFilter {
-        entities: HashSet::from_iter(["a1e28c88-be24-48b0-b18a-81531e669905"
-            .parse::<uuid::Uuid>()
-            .unwrap()
-            .into()]),
+        entities: HashSet::from_iter([
+            Uuid::parse_str("a1e28c88-be24-48b0-b18a-81531e669905").unwrap()
+        ]),
         kinds: HashSet::from_iter(["twitter/new_tweet".to_owned()]),
     };
 
     let update = UpdateUserSetting {
-        user_id: id.into(),
         token,
         event_filter: event_filter.clone(),
     };
@@ -229,8 +265,68 @@ fn test_update_user_settings() {
     let res = call(update).unwrap();
 
     assert!(res.is_ok());
+    let token = new_session(user_id).unwrap().unwrap().token;
 
-    let user = call(GetUser { user_id: id.into() }).unwrap().unwrap();
+    let user = call(AuthUser { user_id, token }).unwrap().unwrap().user;
 
     assert_eq!(user.event_filter, event_filter);
+}
+
+#[test]
+fn test_admin() {
+    prep();
+
+    let admin_id = Uuid::parse_str("7f04280b-1840-1006-ca6d-064b9bf680cd").unwrap();
+
+    // Get admin token
+    let token = call(NewSession {
+        password: "TEST".to_owned(),
+        user_id: admin_id,
+    })
+    .unwrap()
+    .unwrap()
+    .token;
+
+    let name = Name {
+        name: HashMap::from_iter([(LanguageCode::En, "Test".to_owned())]),
+        default_language: LanguageCode::En,
+    };
+
+    let new_ent = call(AddEntity {
+        meta: Meta { name, group: None },
+        token: token.clone(),
+        tasks: vec![AddTaskParam::Youtube {
+            channel_id: "TestChannel".to_owned(),
+        }],
+    })
+    .unwrap()
+    .unwrap();
+
+    tracing::info!(?new_ent);
+
+    let new_task = call(AddTask {
+        entity_id: new_ent.id,
+        token,
+        param: AddTaskParam::Bilibili {
+            uid: "Test".to_owned(),
+        },
+    })
+    .unwrap()
+    .unwrap();
+
+    tracing::info!(?new_task);
+
+    // new_ent.tasks.push(new_task);
+
+    let ent_in_db = call(GetEntities {})
+        .unwrap()
+        .unwrap()
+        .vtbs
+        .into_iter()
+        .find(|x| x.id == new_ent.id)
+        .unwrap();
+
+    assert_eq!(ent_in_db.tasks.len(), 2);
+    assert!(ent_in_db.tasks.contains(&new_task.id));
+    assert_eq!(ent_in_db.meta, new_ent.meta);
 }

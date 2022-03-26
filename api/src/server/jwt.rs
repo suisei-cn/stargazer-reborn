@@ -4,32 +4,29 @@ use std::{
 };
 
 use color_eyre::{eyre::Context, Result};
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, TokenData, Validation};
+use jsonwebtoken::{
+    errors::Result as JwtResult, DecodingKey, EncodingKey, Header, TokenData, Validation,
+};
+use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::server::Config;
+use crate::{
+    rpc::{ApiError, ApiResult},
+    server::Config,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// The JWT claim. Contains the user id and the expiry time.
 pub struct Claims {
-    /// Bytes representation of user id which can be decode and encoded into [`uuid::Uuid`].
+    /// Bytes representation of user id which can be decode and encoded into [`Uuid`].
     aud: [u8; 16],
+    /// Admin privilege.
+    admin: bool,
     /// Expiration time represented in Unix timestamp.
     exp: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct ValidateResult {
-    pub valid: bool,
-    pub claims: Claims,
-}
-
 impl Claims {
-    /// This method will no validate exp since by default it has been validated by jsonwebtoken.
-    pub fn validate(&self, user_id: &uuid::Uuid) -> bool {
-        &self.aud == user_id.as_bytes()
-    }
-
     /// The `exp` of the token in [`SystemTime`].
     pub fn valid_until(&self) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(self.exp as u64)
@@ -38,6 +35,20 @@ impl Claims {
     /// Expiration time of the token in Unix timestamp.
     pub fn exp(&self) -> usize {
         self.exp
+    }
+
+    /// User id represented as [`Uuid`].
+    pub fn id(&self) -> Uuid {
+        Uuid::from_bytes(self.aud)
+    }
+
+    /// Validate the user has admin privilege.
+    pub fn assert_admin(&self) -> ApiResult<()> {
+        if self.admin {
+            Ok(())
+        } else {
+            Err(ApiError::unauthorized())
+        }
     }
 }
 
@@ -72,10 +83,11 @@ impl JWTContext {
             .as_secs() as usize
     }
 
-    pub fn encode(&self, user_id: &uuid::Uuid) -> Result<(String, Claims)> {
+    pub fn encode(&self, user_id: &Uuid, is_admin: bool) -> Result<(String, Claims)> {
         let claim = Claims {
-            aud: *user_id.as_bytes(),
+            aud: user_id.bytes(),
             exp: self.valid_until(),
+            admin: is_admin,
         };
         let token = jsonwebtoken::encode(&self.header, &claim, &self.encode_key)
             .wrap_err("Failed to encode JWT")?;
@@ -90,17 +102,8 @@ impl JWTContext {
         jsonwebtoken::decode::<Claims>(token.as_ref(), &self.decode_key, &self.val)
     }
 
-    pub fn validate(
-        &self,
-        token: impl AsRef<str>,
-        user_id: &uuid::Uuid,
-    ) -> jsonwebtoken::errors::Result<ValidateResult> {
-        let claims = self.decode(token)?.claims;
-
-        Ok(ValidateResult {
-            valid: claims.validate(user_id),
-            claims,
-        })
+    pub fn validate(&self, token: impl AsRef<str>) -> JwtResult<Claims> {
+        Ok(self.decode(token)?.claims)
     }
 }
 
@@ -118,9 +121,7 @@ impl Debug for JWTContext {
 
 #[test]
 fn test_jwt() {
-    let user_id = "20bdc51a-a23e-4f38-bbff-739d2b8ded4d"
-        .parse::<uuid::Uuid>()
-        .unwrap();
+    let user_id = Uuid::parse_str("20bdc51a-a23e-4f38-bbff-739d2b8ded4d").unwrap();
 
     let config = Config {
         bot_password: "Secret".to_string(),
@@ -133,14 +134,14 @@ fn test_jwt() {
 
     println!("{:#?}", jwt);
 
-    let (token, _) = jwt.encode(&user_id).unwrap();
+    let (token, _) = jwt.encode(&user_id, false).unwrap();
     println!("{}", token);
 
     // Valid and not expired
-    assert!(jwt.validate(&token, &user_id).unwrap().valid);
+    jwt.validate(&token).unwrap();
 
     std::thread::sleep(Duration::from_secs(2));
 
     // Valid but expired
-    assert!(jwt.validate(&token, &user_id).is_err());
+    assert!(jwt.validate(&token).is_err());
 }

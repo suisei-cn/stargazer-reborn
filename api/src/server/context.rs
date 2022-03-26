@@ -1,12 +1,15 @@
 //! Context of the server. Contains the configuration and database handle.
 use std::sync::Arc;
 
-use mongodb::{bson::doc, Collection};
+use mongodb::{
+    bson::{doc, Uuid},
+    Collection,
+};
 use sg_core::models::{Entity, Group, Task, User};
 
 use crate::{
-    rpc::{ApiError, ApiResult},
-    server::{config::Config, Claims, JWTContext, ValidateResult, DB},
+    rpc::{ApiError, ApiResult, UserExt},
+    server::{config::Config, Claims, JWTContext, DB},
 };
 
 #[derive(Debug, Clone)]
@@ -39,11 +42,18 @@ impl Context {
         &self.db.groups
     }
 
-    pub async fn find_user(&self, id: &uuid::Uuid) -> Result<User, ApiError> {
+    pub async fn find_user(&self, id: &Uuid) -> Result<User, ApiError> {
         self.users()
             .find_one(doc! { "id": id }, None)
             .await?
             .ok_or_else(|| ApiError::user_not_found(id))
+    }
+
+    pub async fn find_entity(&self, id: &Uuid) -> Result<Entity, ApiError> {
+        self.entities()
+            .find_one(doc! { "id": id }, None)
+            .await?
+            .ok_or_else(|| ApiError::entity_not_found(id))
     }
 
     pub fn auth_password(&self, password: impl AsRef<str>) -> Result<(), ApiError> {
@@ -54,18 +64,16 @@ impl Context {
         }
     }
 
-    pub fn validate_token(
-        &self,
-        token: impl AsRef<str>,
-        user_id: &uuid::Uuid,
-    ) -> ApiResult<Claims> {
-        match self.jwt.validate(token, user_id) {
-            Ok(ValidateResult {
-                valid: true,
-                claims,
-            }) => Ok(claims),
-            Ok(ValidateResult { valid: false, .. }) => Err(ApiError::bad_token()),
-            Err(e) => Err(e.into()),
-        }
+    pub fn validate_token(&self, token: impl AsRef<str>) -> ApiResult<Claims> {
+        self.jwt.validate(token).map_err(|_| ApiError::bad_token())
+    }
+
+    pub async fn find_and_assert_token(&self, token: impl AsRef<str>) -> ApiResult<User> {
+        let user_id = self.validate_token(&token)?.id();
+        self.find_user(&user_id).await
+    }
+
+    pub async fn find_and_assert_admin(&self, token: impl AsRef<str>) -> ApiResult<User> {
+        self.find_and_assert_token(token).await?.assert_admin()
     }
 }

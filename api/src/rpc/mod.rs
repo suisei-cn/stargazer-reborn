@@ -52,11 +52,10 @@
 //! **Notice**: This macro **MUST** only be called once in the module,
 //! otherwise duplicate definitions of [`Requests`](models::Requests) will be generated.
 
-mod_use::mod_use![wrapper, traits, error];
+mod_use::mod_use![wrapper, traits, error, ext, utils];
 
 pub mod models;
 
-#[macro_export]
 /// A convenient macro to generate all RPC methods.
 ///
 /// # Example
@@ -78,6 +77,7 @@ pub mod models;
 ///     } -> User
 /// }
 /// ```
+#[macro_export]
 macro_rules! methods {
     ($(
         $( #[ $method_meta:meta ] )*
@@ -162,9 +162,35 @@ macro_rules! methods {
     };
 }
 
+/// Implement [`Response`] for a series of types.
+/// All of them are successful.
+///
+/// # Example
+/// ```rust, no_run
+/// struct Foo { foo: String };
+///
+/// struct Bar { bar: usize };
+///
+/// successful_response![Foo, Bar];
+/// ```
+#[macro_export]
+macro_rules! successful_response {
+    [ $( $ty:ty ),* ] => {
+        $(
+            impl $crate::rpc::Response for $ty {
+                fn is_successful(&self) -> bool {
+                    true
+                }
+            }
+        )*
+    };
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 mod test_macro {
+    use mongodb::bson::Uuid;
+
     use crate::{
         rpc::{ApiError, Request, Response},
         timestamp,
@@ -225,7 +251,7 @@ mod test_macro {
             r#"{{"data":{{"error":["Cannot find user with ID `{id}`"]}},"success":false,"time":"{now}"}}"#,
         );
 
-        let mut resp_obj = ApiError::user_not_found(&id.parse().unwrap()).packed();
+        let mut resp_obj = ApiError::user_not_found(&Uuid::parse_str(id).unwrap()).packed();
         resp_obj.time = now;
 
         assert_eq!(resp, resp_obj.to_json());
