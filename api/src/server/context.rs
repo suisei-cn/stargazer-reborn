@@ -31,8 +31,13 @@ impl Context {
         let client = Client::with_uri_str(&config.mongo_uri).await?;
         let db = client.database(&config.mongo_db);
 
-        Ok(Self { db, jwt, config })
+        Ok(Self::new_with_db(db, jwt, config))
     }
+
+    pub fn new_with_db(db: Database, jwt: Arc<JWTContext>, config: Arc<Config>) -> Self {
+        Self { db, jwt, config }
+    }
+
     pub fn users(&self) -> Collection<User> {
         self.db.collection(&self.config.users_collection)
     }
@@ -83,4 +88,43 @@ impl Context {
     pub async fn find_and_assert_admin(&self, token: impl AsRef<str>) -> ApiResult<User> {
         self.find_and_assert_token(token).await?.assert_admin()
     }
+}
+
+#[tokio::test]
+async fn test_fetch_entity_from_db() {
+    tracing_subscriber::fmt::init();
+    let client = Client::with_uri_str("mongodb://192.168.1.53:27017")
+        .await
+        .unwrap();
+    let db = client.database("stargazer-reborn");
+    let col = db.collection::<Entity>("entities");
+
+    let res = col
+        .find_one(doc! { "meta.name.name": { "$gt": {} } }, None)
+        .await
+        .unwrap();
+    tracing::info!(?res);
+}
+
+#[test]
+fn test_bson_entity() {
+    use isolanguage_1::LanguageCode;
+    use mongodb::bson::{from_bson, to_bson};
+    use sg_core::models::{Meta, Name};
+    use std::collections::HashMap;
+
+    let name = Name {
+        name: HashMap::from_iter([(LanguageCode::En, "Test".to_owned())]),
+        default_language: LanguageCode::En,
+    };
+
+    let meta = Meta { name, group: None };
+
+    let ser = to_bson(&meta).unwrap();
+
+    tracing::info!(ser = ?ser);
+
+    let de = from_bson(ser).unwrap();
+
+    assert_eq!(meta, de);
 }

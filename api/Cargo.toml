@@ -26,9 +26,13 @@ tokio              = { version = "1.17.0", features = ["rt", "rt-multi-thread", 
 mongodb            = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc" }
 tower-http         = { version = "0.2.5", features = ["cors", "trace"] }
 
+# Dependencies for bin `fake-data`
 fake               = { version = "2.4.3", features = ["uuid"], optional = true }
 rand               = { version = "0.8.5", optional = true }
 uuid               = { version = "0.8.2", optional = true }
+
+reqwest   = { version = "0.11.10", optional = true }
+
 
 [dev-dependencies]
 figment   = { version = "0.10.6", features = ["test"] }
@@ -36,7 +40,7 @@ reqwest   = { version = "0.11.10", features = ["blocking"] }
 once_cell = "1.10.0"
 
 [features]
-client = []
+client = ["dep:reqwest"]
 server = []
 gen_fake = ["dep:uuid", "dep:fake", "dep:rand"]
 

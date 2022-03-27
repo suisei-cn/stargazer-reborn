@@ -3,7 +3,7 @@
 use mongodb::bson;
 use sg_core::models::{Task, User};
 
-use crate::rpc::{map, ApiError, ApiResult};
+use crate::rpc::{map, models::AddTask, ApiError, ApiResult};
 
 pub trait UserExt: Sized {
     fn assert_admin(self) -> ApiResult<Self>;
@@ -52,5 +52,14 @@ impl TaskExt for Task {
             kind: "twitter".to_string(),
             params: map("id", id),
         }
+    }
+}
+
+impl From<AddTask> for Task {
+    fn from(new_task: AddTask) -> Self {
+        let AddTask {
+            entity_id, param, ..
+        } = new_task;
+        param.into_task_with(entity_id)
     }
 }

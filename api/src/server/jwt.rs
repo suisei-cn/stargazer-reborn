@@ -33,7 +33,7 @@ impl Claims {
     }
 
     /// Expiration time of the token in Unix timestamp.
-    pub fn exp(&self) -> usize {
+    pub fn valid_until_timestamp(&self) -> usize {
         self.exp
     }
 
@@ -43,7 +43,7 @@ impl Claims {
     }
 
     /// Validate the user has admin privilege.
-    pub fn assert_admin(&self) -> ApiResult<()> {
+    pub fn ensure_admin(&self) -> ApiResult<()> {
         if self.admin {
             Ok(())
         } else {

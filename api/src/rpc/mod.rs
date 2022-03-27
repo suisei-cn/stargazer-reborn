@@ -152,13 +152,15 @@ macro_rules! methods {
 
         #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
         #[serde(tag = "method", content = "params")]
-        #[serde(rename_all = "camelCase")]
+        #[serde(rename_all = "snake_case")]
         #[non_exhaustive]
         pub enum Requests {
             $( $req($req), )*
             #[serde(other)]
             Unknown
         }
+
+
     };
 }
 

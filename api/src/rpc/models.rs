@@ -30,23 +30,7 @@ impl AddTaskParam {
     }
 }
 
-impl From<AddTask> for Task {
-    fn from(new_task: AddTask) -> Self {
-        let AddTask {
-            entity_id, param, ..
-        } = new_task;
-        param.into_task_with(entity_id)
-    }
-}
-
-/// Response object that has no content.
-/// Usually be used to indictate the operation is successful but nothing to return.
-/// Similar to HTTP Code 204.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Null;
-
-// wrap_uuid_type![Entity, Task, User, Group];
-successful_response![Null, Entity, Task, User, Group];
+successful_response![Entity, Task, User, Group];
 
 crate::methods! {
     // ---------------------- //
@@ -54,7 +38,7 @@ crate::methods! {
     // ---------------------- //
 
     /// Get all entities, include vtbs and groups
-    "getEntities" := GetEntities {} -> Entities {
+    "get_entities" := GetEntities {} -> Entities {
         vtbs: Vec<Entity>,
         groups: Vec<Group>
     },
@@ -63,12 +47,12 @@ crate::methods! {
     // Does require Token //
     // ------------------ //
 
-    "updateUserSetting" := UpdateUserSetting {
+    "update_setting" := UpdateSetting {
         token: String,
         event_filter: EventFilter
-    } -> Null,
+    } -> User,
 
-    "authUser" := AuthUser {
+    "auth_user" := AuthUser {
         user_id: Uuid,
         token: String,
     } -> Authorized {
@@ -81,14 +65,19 @@ crate::methods! {
     // Does require Admin //
     // ------------------ //
 
-    "addTask" := AddTask {
+    "add_task" := AddTask {
         token: String,
         #[serde(flatten)]
         param: AddTaskParam,
         entity_id: Uuid,
     } -> Task,
 
-    "addEntity" := AddEntity {
+    "del_task" := DelTask {
+        token: String,
+        task_id: Uuid
+    } -> Task,
+
+    "add_entity" := AddEntity {
         token: String,
         meta: Meta,
         tasks: Vec<AddTaskParam>
@@ -113,7 +102,7 @@ crate::methods! {
     /// Create a new session for user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "newSession" := NewSession {
+    "new_session" := NewSession {
         user_id: Uuid,
         // Bot password
         password: String
@@ -126,7 +115,7 @@ crate::methods! {
     /// Create a new user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "addUser" := AddUser {
+    "add_user" := AddUser {
         // The IM that the user is in.
         im: String,
         // Avatar of the user.
@@ -140,7 +129,7 @@ crate::methods! {
     /// Delete an existing user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "delUser" := DelUser {
+    "del_user" := DelUser {
         user_id: Uuid
         // Bot password
         password: String,

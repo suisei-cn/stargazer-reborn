@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::rpc::{
     models::{
         AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewSession,
-        Session, UpdateUserSetting,
+        Session, UpdateSetting,
     },
     ApiError, ApiResult, Request, ResponseObject,
 };
@@ -188,26 +188,11 @@ fn test_new_user_wrong_password() {
 fn test_get_entities() {
     prep();
 
-    // let req = GetEntities {};
+    let req = GetEntities {};
 
-    // let res = call(req).unwrap().unwrap();
+    let res = call(req).unwrap().unwrap();
 
-    // tracing::info!(entities = ?res);
-
-    let name = Name {
-        name: HashMap::from_iter([(LanguageCode::En, "Test".to_owned())]),
-        default_language: LanguageCode::En,
-    };
-
-    let meta = Meta { name, group: None };
-
-    let ser = serde_json::to_string(&meta).unwrap();
-
-    tracing::info!(ser = ser.as_str());
-
-    let de = serde_json::from_str(&ser).unwrap();
-
-    assert_eq!(meta, de);
+    tracing::info!(entities = ?res);
 }
 
 #[test]
@@ -257,7 +242,7 @@ fn test_update_user_settings() {
         kinds: HashSet::from_iter(["twitter/new_tweet".to_owned()]),
     };
 
-    let update = UpdateUserSetting {
+    let update = UpdateSetting {
         token,
         event_filter: event_filter.clone(),
     };
