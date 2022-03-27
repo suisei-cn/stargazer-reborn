@@ -2,13 +2,9 @@
 
 use std::ops::{Deref, DerefMut};
 
-use axum::{http::StatusCode, response::Response as AxumResponse, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    rpc::{ApiError, Response},
-    timestamp,
-};
+use crate::{rpc::ApiError, timestamp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
@@ -125,19 +121,5 @@ impl<T> Deref for ResponseObject<T> {
 impl<T> DerefMut for ResponseObject<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
-    }
-}
-
-impl<R: Response> axum::response::IntoResponse for ResponseObject<R> {
-    fn into_response(self) -> AxumResponse {
-        let status = if self.success {
-            StatusCode::OK
-        } else {
-            StatusCode::BAD_REQUEST
-        };
-
-        let mut body = Json(self).into_response();
-        *body.status_mut() = status;
-        body
     }
 }

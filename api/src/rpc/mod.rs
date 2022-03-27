@@ -52,7 +52,7 @@
 //! **Notice**: This macro **MUST** only be called once in the module,
 //! otherwise duplicate definitions of [`Requests`](models::Requests) will be generated.
 
-mod_use::mod_use![wrapper, traits, error, ext, utils];
+mod_use::mod_use![wrapper, traits, error, ext];
 
 pub mod models;
 

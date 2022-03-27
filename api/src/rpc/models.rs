@@ -135,31 +135,3 @@ crate::methods! {
         password: String,
     } -> User,
 }
-
-// #[test]
-// fn test_new_task() {
-//     use serde_json::json;
-
-//     let value = json!({
-//         "entity_id": "60801d9c-0b76-42ad-8802-1f97c97438a2",
-//         "kind": "youtube",
-//         "channel_id": "UC0ecof5ekL_cNzdmncJL3uA"
-//     });
-
-//     let fake_id = "60801d9c-0b76-42ad-8802-1f97c97438a2"
-//         .parse::<Uuid>()
-//         .unwrap()
-//         .into();
-
-//     let obj: AddTask = serde_json::from_value(value).unwrap();
-//     let mut task: Task = obj.into();
-
-//     let mut new_task = Task::new_youtube(
-//         "UC0ecof5ekL_cNzdmncJL3uA",
-//         "60801d9c-0b76-42ad-8802-1f97c97438a2".parse().unwrap(),
-//     );
-//     task.id = fake_id;
-//     new_task.id = fake_id;
-
-//     assert_eq!(task, new_task);
-// }

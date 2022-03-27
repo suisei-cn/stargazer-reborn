@@ -9,7 +9,7 @@ use crate::rpc::models::Requests;
 #[cfg(test)]
 mod test;
 
-mod_use::mod_use![config, handler, jwt, context];
+mod_use::mod_use![config, handler, jwt, context, ext];
 
 pub async fn serve_with_config(config: Config) -> Result<()> {
     let config = Arc::new(config);

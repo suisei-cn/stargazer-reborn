@@ -8,31 +8,34 @@ edition = "2021"
 [dependencies]
 sg-core = { package = "core", path = "../core" }
 
-url                = "2.2.2"
-axum               = "0.4.8"
-http               = "0.2.6"
-tracing            = "0.1.32"
-futures            = "0.3.21"
-mod_use            = "0.2.0"
-color-eyre         = "0.6.1"
-serde_json         = "1.0.79"
-jsonwebtoken       = "8.0.1"
-humantime-serde    = "1.1.1"
-tracing-subscriber = "0.3.9"
-serde              = { version = "1.0.136", features = ["derive"] }
-figment            = { version = "0.10.6", features = ["env"] }
-isolanguage-1      = { version = "0.2.2", features = ["serde"] }
-tokio              = { version = "1.17.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
-mongodb            = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc" }
-tower-http         = { version = "0.2.5", features = ["cors", "trace"] }
+url             = "2.2.2"
+tracing         = "0.1.32"
+futures         = "0.3.21"
+mod_use         = "0.2.0"
+serde_json      = "1.0.79"
+humantime-serde = "1.1.1"
+serde           = { version = "1.0.136", features = ["derive"] }
+figment         = { version = "0.10.6", features = ["env"] }
+isolanguage-1   = { version = "0.2.2", features = ["serde"] }
+mongodb         = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc", default-features = false }
 
 # Dependencies for bin `fake-data`
 fake               = { version = "2.4.3", features = ["uuid"], optional = true }
 rand               = { version = "0.8.5", optional = true }
 uuid               = { version = "0.8.2", optional = true }
 
-reqwest   = { version = "0.11.10", optional = true }
+# Dependencies for client
+reqwest   = { version = "0.11.10", optional = true, features = ["json"] }
+thiserror = { version = "1.0.30", optional = true }
 
+# Dependencies for server
+color-eyre         = { version = "0.6.1", optional = true }
+http               = { version = "0.2.6", optional = true }
+axum               = { version = "0.4.8", optional = true }
+tokio              = { version = "1.17.0", optional = true, features = ["rt", "rt-multi-thread", "time", "macros"] }
+tower-http         = { version = "0.2.5", optional = true, features = ["cors", "trace"] }
+jsonwebtoken       = { version = "8.0.1", optional = true }
+tracing-subscriber = { version = "0.3.9", optional = true }
 
 [dev-dependencies]
 figment   = { version = "0.10.6", features = ["test"] }
@@ -40,9 +43,9 @@ reqwest   = { version = "0.11.10", features = ["blocking"] }
 once_cell = "1.10.0"
 
 [features]
-client = ["dep:reqwest"]
-server = []
-gen_fake = ["dep:uuid", "dep:fake", "dep:rand"]
+client = ["dep:reqwest", "dep:thiserror"]
+server = ["dep:http", "dep:axum", "dep:tower-http", "dep:jsonwebtoken", "dep:tracing-subscriber", "dep:tokio", "mongodb/default", "dep:color-eyre"]
+gen_fake = ["dep:uuid", "dep:fake", "dep:rand", "dep:tokio"]
 
 [[bin]]
 name = "server"

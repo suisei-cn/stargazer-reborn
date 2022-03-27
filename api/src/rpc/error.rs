@@ -1,3 +1,4 @@
+use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
 use crate::rpc::{Response, ResponseObject};
@@ -5,27 +6,6 @@ use crate::rpc::{Response, ResponseObject};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
     pub error: Vec<String>,
-}
-
-impl axum::response::IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
-        self.packed().into_response()
-    }
-}
-
-impl From<jsonwebtoken::errors::Error> for ApiError {
-    fn from(e: jsonwebtoken::errors::Error) -> Self {
-        tracing::warn!("{}", e);
-        Self::bad_token()
-    }
-}
-
-impl From<mongodb::error::Error> for ApiError {
-    fn from(err: mongodb::error::Error) -> Self {
-        let err_str = err.to_string();
-        tracing::error!(error = err_str.as_str(), "Mongo error");
-        ApiError::internal_error()
-    }
 }
 
 /// Represents an API Error. Implemented [`IntoResponse`] trait.
@@ -86,15 +66,15 @@ impl ApiError {
         Self::new(vec!["Wrong password".to_owned()])
     }
 
-    pub fn user_not_found(user_id: &mongodb::bson::Uuid) -> Self {
+    pub fn user_not_found(user_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
     }
 
-    pub fn entity_not_found(entity_id: &mongodb::bson::Uuid) -> Self {
+    pub fn entity_not_found(entity_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find entity with ID `{}`", entity_id)])
     }
 
-    pub fn task_not_found(task_id: &mongodb::bson::Uuid) -> Self {
+    pub fn task_not_found(task_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find task with ID `{}`", task_id)])
     }
 
