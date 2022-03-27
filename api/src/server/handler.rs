@@ -1,8 +1,8 @@
 use crate::{
     rpc::{
         models::{
-            AddEntity, AddTask, AddUser, AuthUser, Authorized, DelUser, Entities, GetEntities,
-            NewSession, Null, Requests, Session, UpdateUserSetting,
+            AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
+            Entities, GetEntities, NewSession, Requests, Session, UpdateEntity, UpdateSetting,
         },
         ApiError, ApiResult, Request, Response,
     },
@@ -10,31 +10,27 @@ use crate::{
 };
 
 use axum::response::{IntoResponse, Response as AxumResponse};
-use futures::{
-    future::{try_join, BoxFuture},
-    Future, FutureExt, TryStreamExt,
+use futures::{future::try_join, Future, TryStreamExt};
+use mongodb::{
+    bson::{doc, to_bson, Uuid},
+    options::{FindOneAndUpdateOptions, ReturnDocument},
 };
-use mongodb::bson::{doc, Uuid};
 use sg_core::models::{self as m, Entity, EventFilter, Task, User};
 
 fn assert_method<T: Request, M: Method<T>>(_: &M) {}
 
-pub(crate) trait Method<Req: Request> {
-    fn handle(self, req: Req, context: Context) -> BoxFuture<'static, ApiResult<Req::Res>>;
-}
+/// Marker trait to ensure handlers are in a good shape.
+pub(crate) trait Method<Req: Request> {}
 
 impl<Req, M, F> Method<Req> for M
 where
     Req: Request,
-    F: Future<Output = ApiResult<Req::Res>> + Send + 'static,
+    F: Future<Output = ApiResult<Req::Res>>,
     M: FnOnce(Req, Context) -> F,
 {
-    fn handle(self, req: Req, context: Context) -> BoxFuture<'static, ApiResult<Req::Res>> {
-        self(req, context).boxed()
-    }
 }
 
-macro_rules! dispatch {
+macro_rules! static_dispatch {
     ($self:ident, $ctx:ident, $( $req_variant: ident => $func: expr $(,)? )* ) => {
 
         match $self {
@@ -75,17 +71,19 @@ impl Requests {
     ///
     /// While in release mode, unimplemented methods will simply not compile.
     pub async fn handle(self, ctx: Context) -> AxumResponse {
-        dispatch![
+        static_dispatch![
             self, ctx,
-            // GetUser => |req: GetUser, ctx: Context| async move { ctx.find_user(&req.user_id).await.map(Into::into) },
             GetEntities => get_entities,
             AddUser => add_user,
             AddEntity => add_entity,
             AddTask => add_task,
             AuthUser => auth_user,
             DelUser => del_user,
+            DelEntity => del_entity,
+            DelTask => del_task,
+            UpdateEntity => update_entity,
             NewSession => new_session,
-            UpdateUserSetting => update_user_setting,
+            UpdateSetting => update_setting,
         ]
     }
 }
@@ -93,7 +91,7 @@ impl Requests {
 async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
     let AddEntity { meta, tasks, token } = req;
 
-    ctx.validate_token(token)?.assert_admin()?;
+    ctx.validate_token(token)?.ensure_admin()?;
 
     tracing::info!(meta = ?meta);
 
@@ -117,71 +115,125 @@ async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
     Ok(ent)
 }
 
+async fn update_entity(req: UpdateEntity, ctx: Context) -> ApiResult<Entity> {
+    let UpdateEntity {
+        entity_id,
+        meta,
+        token,
+    } = req;
+
+    ctx.validate_token(token)?.ensure_admin()?;
+
+    let ser = to_bson(&meta).map_err(|_| ApiError::bad_request("Invalid meta"))?;
+
+    ctx.entities()
+        .find_one_and_update(
+            doc! { "id": entity_id },
+            doc! { "meta": ser },
+            FindOneAndUpdateOptions::builder()
+                .return_document(ReturnDocument::After)
+                .build(),
+        )
+        .await?
+        .ok_or_else(|| ApiError::entity_not_found(&entity_id))
+}
+
+async fn del_entity(req: DelEntity, ctx: Context) -> ApiResult<Entity> {
+    let DelEntity { entity_id, token } = req;
+
+    ctx.validate_token(token)?.ensure_admin()?;
+
+    // Get the entity, make sure it exists and get all related tasks
+    let entity = ctx
+        .entities()
+        .find_one_and_delete(doc! { "id": entity_id }, None)
+        .await?
+        .ok_or_else(|| ApiError::entity_not_found(&entity_id))?;
+
+    // Delete all related tasks
+    ctx.tasks()
+        .delete_many(doc! { "id": { "$in": &entity.tasks } }, None)
+        .await?;
+
+    Ok(entity)
+}
+
 async fn add_task(req: AddTask, ctx: Context) -> ApiResult<Task> {
-    ctx.validate_token(&req.token)?.assert_admin()?;
+    ctx.validate_token(&req.token)?.ensure_admin()?;
 
     let id = req.entity_id;
     let task: Task = req.into();
 
     ctx.tasks().insert_one(&task, None).await?;
 
-    let res = ctx
+    if ctx
         .entities()
         .update_one(
             doc! { "id": id },
             doc! { "$push": { "tasks": task.id } },
             None,
         )
-        .await?;
-
-    match res.matched_count {
-        1 => Ok(task),
-        0 => Err(ApiError::entity_not_found(&id)),
-        n => {
-            tracing::error!("One entity_id mapped to {} entities", n);
-            Ok(task)
-        }
+        .await?
+        .modified_count
+        == 0
+    {
+        Err(ApiError::entity_not_found(&id))
+    } else {
+        Ok(task)
     }
 }
 
-async fn update_user_setting(req: UpdateUserSetting, ctx: Context) -> ApiResult<Null> {
-    let UpdateUserSetting {
+async fn del_task(req: DelTask, ctx: Context) -> ApiResult<Task> {
+    let DelTask { task_id, token } = req;
+
+    ctx.validate_token(token)?.ensure_admin()?;
+
+    // Make sure this exists
+    let task = ctx
+        .tasks()
+        .find_one_and_delete(doc! { "id": task_id }, None)
+        .await?
+        .ok_or_else(|| ApiError::task_not_found(&task_id))?;
+
+    // Delete the task from the entity that holds it
+    ctx.entities()
+        .update_one(
+            doc! { "id": task.entity },
+            doc! { "tasks": { "$pull": task_id } },
+            None,
+        )
+        .await?;
+
+    Ok(task)
+}
+
+async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
+    let UpdateSetting {
         token,
         event_filter,
     } = req;
 
     let user_id = ctx.validate_token(&token)?.id();
 
-    let serialized = mongodb::bson::to_bson(&event_filter)
-        .expect("reqs deserialized from JSON should be legal to be serialized again");
+    let serialized =
+        to_bson(&event_filter).map_err(|_| ApiError::bad_request("Invalid event filter"))?;
 
-    let res = ctx
-        .users()
-        .update_one(
+    ctx.users()
+        .find_one_and_update(
             doc! { "id": user_id },
             doc! { "$set": { "event_filter": serialized } },
             None,
         )
-        .await?;
-
-    match res.matched_count {
-        1 => Ok(Null),
-        0 => Err(ApiError::user_not_found(&user_id)),
-        n => {
-            tracing::error!("One user_id mapped to {} users", n);
-            Ok(Null)
-        }
-    }
+        .await?
+        .ok_or_else(|| ApiError::user_not_found(&user_id))
 }
 
 async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
-    let (entities, groups) = try_join(
-        ctx.entities().find(None, None),
-        ctx.groups().find(None, None),
+    let (vtbs, groups) = try_join(
+        async { ctx.entities().find(None, None).await?.try_collect().await },
+        async { ctx.groups().find(None, None).await?.try_collect().await },
     )
     .await?;
-    let vtbs = entities.map_ok(Into::into).try_collect().await?;
-    let groups = groups.try_collect().await?;
 
     Ok(Entities { vtbs, groups })
 }
@@ -213,14 +265,15 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
     Ok(user)
 }
 
-async fn del_user(req: DelUser, ctx: Context) -> ApiResult<Null> {
+async fn del_user(req: DelUser, ctx: Context) -> ApiResult<User> {
     let DelUser { password, user_id } = req;
 
     ctx.auth_password(password)?;
     ctx.find_user(&user_id).await?;
-    ctx.users().delete_one(doc! { "id": user_id }, None).await?;
-
-    Ok(Null)
+    ctx.users()
+        .find_one_and_delete(doc! { "id": user_id }, None)
+        .await?
+        .ok_or_else(|| ApiError::user_not_found(&user_id))
 }
 
 async fn auth_user(AuthUser { token, user_id }: AuthUser, ctx: Context) -> ApiResult<Authorized> {

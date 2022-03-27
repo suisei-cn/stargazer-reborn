@@ -94,6 +94,10 @@ impl ApiError {
         Self::new(vec![format!("Cannot find entity with ID `{}`", entity_id)])
     }
 
+    pub fn task_not_found(task_id: &mongodb::bson::Uuid) -> Self {
+        Self::new(vec![format!("Cannot find task with ID `{}`", task_id)])
+    }
+
     pub fn bad_request(error: impl Into<String>) -> Self {
         Self::new(vec!["Bad request".to_owned(), error.into()])
     }

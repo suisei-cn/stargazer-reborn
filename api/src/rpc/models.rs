@@ -94,6 +94,18 @@ crate::methods! {
         tasks: Vec<AddTaskParam>
     } -> Entity,
 
+    /// Update the entity's meta. Return the updated entity.
+    "update_entity" := UpdateEntity {
+        token: String,
+        entity_id: Uuid,
+        meta: Meta,
+    } -> Entity,
+
+    "del_entity" := DelEntity {
+        token: String,
+        entity_id: Uuid
+    } -> Entity,
+
     // --------------------- //
     // Does require Password //
     // --------------------- //
@@ -132,7 +144,7 @@ crate::methods! {
         user_id: Uuid
         // Bot password
         password: String,
-    } -> Null,
+    } -> User,
 }
 
 // #[test]
