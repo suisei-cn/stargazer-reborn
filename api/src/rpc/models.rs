@@ -38,7 +38,7 @@ crate::methods! {
     // ---------------------- //
 
     /// Get all entities, include vtbs and groups
-    "get_entities" := GetEntities {} -> Entities {
+    get_entities := GetEntities {} -> Entities {
         vtbs: Vec<Entity>,
         groups: Vec<Group>
     },
@@ -47,12 +47,12 @@ crate::methods! {
     // Does require Token //
     // ------------------ //
 
-    "update_setting" := UpdateSetting {
+    update_setting := UpdateSetting {
         token: String,
         event_filter: EventFilter
     } -> User,
 
-    "auth_user" := AuthUser {
+    auth_user := AuthUser {
         user_id: Uuid,
         token: String,
     } -> Authorized {
@@ -65,32 +65,32 @@ crate::methods! {
     // Does require Admin //
     // ------------------ //
 
-    "add_task" := AddTask {
+    add_task := AddTask {
         token: String,
         #[serde(flatten)]
         param: AddTaskParam,
         entity_id: Uuid,
     } -> Task,
 
-    "del_task" := DelTask {
+    del_task := DelTask {
         token: String,
         task_id: Uuid
     } -> Task,
 
-    "add_entity" := AddEntity {
+    add_entity := AddEntity {
         token: String,
         meta: Meta,
         tasks: Vec<AddTaskParam>
     } -> Entity,
 
     /// Update the entity's meta. Return the updated entity.
-    "update_entity" := UpdateEntity {
+    update_entity := UpdateEntity {
         token: String,
         entity_id: Uuid,
         meta: Meta,
     } -> Entity,
 
-    "del_entity" := DelEntity {
+    del_entity := DelEntity {
         token: String,
         entity_id: Uuid
     } -> Entity,
@@ -102,7 +102,7 @@ crate::methods! {
     /// Create a new session for user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "new_session" := NewSession {
+    new_session := NewSession {
         user_id: Uuid,
         // Bot password
         password: String
@@ -115,7 +115,7 @@ crate::methods! {
     /// Create a new user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "add_user" := AddUser {
+    add_user := AddUser {
         // The IM that the user is in.
         im: String,
         // Avatar of the user.
@@ -129,7 +129,7 @@ crate::methods! {
     /// Delete an existing user. This method should only be used by bots.
     ///
     /// **TODO**: `password` should be replaced by a more secure way in future.
-    "del_user" := DelUser {
+    del_user := DelUser {
         user_id: Uuid
         // Bot password
         password: String,

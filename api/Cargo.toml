@@ -20,9 +20,9 @@ isolanguage-1   = { version = "0.2.2", features = ["serde"] }
 mongodb         = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "6e7accb50bbfe471f64b290c3a45cda5affbd6fc", default-features = false }
 
 # Dependencies for bin `fake-data`
-fake               = { version = "2.4.3", features = ["uuid"], optional = true }
-rand               = { version = "0.8.5", optional = true }
-uuid               = { version = "0.8.2", optional = true }
+fake = { version = "2.4.3", features = ["uuid"], optional = true }
+rand = { version = "0.8.5", optional = true }
+uuid = { version = "0.8.2", optional = true }
 
 # Dependencies for client
 reqwest   = { version = "0.11.10", optional = true, features = ["json"] }
@@ -45,7 +45,7 @@ once_cell = "1.10.0"
 [features]
 client = ["dep:reqwest", "dep:thiserror"]
 server = ["dep:http", "dep:axum", "dep:tower-http", "dep:jsonwebtoken", "dep:tracing-subscriber", "dep:tokio", "mongodb/default", "dep:color-eyre"]
-gen_fake = ["dep:uuid", "dep:fake", "dep:rand", "dep:tokio"]
+gen_fake = ["dep:uuid", "dep:fake", "dep:rand", "dep:tokio", "dep:color-eyre", "dep:tracing-subscriber"]
 
 [[bin]]
 name = "server"

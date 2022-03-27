@@ -42,7 +42,7 @@ impl Client {
         R: Request + Serialize,
         R::Res: DeserializeOwned,
     {
-        let res = self
+        Ok(self
             .client
             .post(self.url.clone())
             .body(req.packed().to_json())
@@ -50,8 +50,8 @@ impl Client {
             .send()
             .await?
             .json::<ResponseObject<Shim<R::Res>>>()
-            .await?;
-
-        Ok(res.data.into())
+            .await?
+            .data
+            .into())
     }
 }

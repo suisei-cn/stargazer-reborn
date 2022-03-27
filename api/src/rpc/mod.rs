@@ -81,7 +81,7 @@ pub mod models;
 macro_rules! methods {
     ($(
         $( #[ $method_meta:meta ] )*
-        $method:literal :=
+        $method:ident :=
         $req:ident {
             $(
                 $( #[ $req_field_meta:meta ] )*
@@ -118,7 +118,7 @@ macro_rules! methods {
             }
 
             impl $crate::rpc::Request for $req {
-                const METHOD: &'static str = $method;
+                const METHOD: &'static str = stringify!($method);
                 type Res = $resp;
             }
 
@@ -160,6 +160,14 @@ macro_rules! methods {
             Unknown
         }
 
+        #[cfg(feature = "client")]
+        impl $crate::client::Client {
+            $(
+                pub async fn $method (&self, req: $req) -> ::std::result::Result<crate::ApiResult<$resp>, $crate::client::Error> {
+                    self.invoke(req).await
+                }
+            )*
+        }
 
     };
 }
@@ -199,7 +207,7 @@ mod test_macro {
     };
 
     crate::methods! {
-        "getUser" :=
+        getUser :=
         GetUser {
             user_id: String
         } -> User {

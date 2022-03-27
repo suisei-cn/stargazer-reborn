@@ -7,3 +7,5 @@ pub mod client;
 
 #[cfg(feature = "server")]
 pub mod server;
+
+pub use rpc::*;

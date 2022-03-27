@@ -10,9 +10,9 @@ use crate::rpc::{
 
 use color_eyre::{eyre::Context, Result};
 use isolanguage_1::LanguageCode;
-use mongodb::bson::Uuid;
+use mongodb::bson::{doc, Uuid};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sg_core::models::{EventFilter, Meta, Name, User};
+use sg_core::models::{Entity, EventFilter, Meta, Name, User};
 
 mod prep {
     use std::{sync::Once, thread::available_parallelism, time::Duration};
@@ -314,4 +314,23 @@ fn test_admin() {
     assert_eq!(ent_in_db.tasks.len(), 2);
     assert!(ent_in_db.tasks.contains(&new_task.id));
     assert_eq!(ent_in_db.meta, new_ent.meta);
+}
+
+#[tokio::test]
+async fn test_get_entity_from_db() {
+    let col = mongodb::Client::with_uri_str("mongodb://192.168.1.53:27017")
+        .await
+        .unwrap()
+        .database("stargazer-reborn")
+        .collection::<Entity>("entities");
+
+    let res = col
+        .find_one(None, None)
+        .await
+        .unwrap()
+        // .try_collect::<Vec<_>>()
+        // .await
+        .unwrap();
+
+    println!("{:?}", res);
 }
