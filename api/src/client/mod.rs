@@ -1,8 +1,12 @@
-use color_eyre::{eyre::Context, Result};
 use reqwest::{IntoUrl, Url};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::rpc::{ApiError, ApiResult, Request, ResponseObject};
+use crate::{
+    client::Result,
+    rpc::{ApiError, ApiResult, Request, ResponseObject},
+};
+
+mod_use::mod_use![error];
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -44,17 +48,10 @@ impl Client {
             .body(req.packed().to_json())
             .header("Content-Type", "application/json")
             .send()
-            .await
-            .wrap_err("Failed to send request")?
-            .text()
-            .await
-            .wrap_err("Failed to read response")?;
+            .await?
+            .json::<ResponseObject<Shim<R::Res>>>()
+            .await?;
 
-        tracing::info!(res = res.as_str());
-        let serialized = serde_json::from_str::<ResponseObject<Shim<R::Res>>>(&res)
-            .wrap_err("Failed to deserialize")
-            .unwrap();
-
-        Ok(serialized.data.into())
+        Ok(res.data.into())
     }
 }
