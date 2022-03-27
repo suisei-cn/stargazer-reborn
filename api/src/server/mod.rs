@@ -9,16 +9,16 @@ use crate::rpc::models::Requests;
 #[cfg(test)]
 mod test;
 
-mod_use::mod_use![db, config, handler, jwt, context];
+mod_use::mod_use![config, handler, jwt, context];
 
 pub async fn serve_with_config(config: Config) -> Result<()> {
+    let config = Arc::new(config);
     tracing::debug!(config = ?config);
 
     let server = axum::Server::bind(&config.bind);
-    let db = DB::new(&config).await?;
     let jwt = Arc::new(JWTContext::new(&config));
 
-    let config = Arc::new(config);
+    let ctx = Context::new(jwt, config).await?;
     let cors_layer = tower_http::cors::CorsLayer::new()
         // Allow `POST` when accessing the resource
         .allow_methods(vec![Method::POST])
@@ -34,7 +34,7 @@ pub async fn serve_with_config(config: Config) -> Result<()> {
             "/v1",
             post(|Json(req): Json<Requests>, Extension(ctx): Extension<Context>| req.handle(ctx)),
         )
-        .layer(Extension(Context { db, jwt, config }))
+        .layer(Extension(ctx))
         .layer(cors_layer)
         .layer(trace_layer)
         .into_make_service();
