@@ -34,7 +34,7 @@ pub struct Meta {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Name {
     /// Name in different languages. The key must be in ISO 639-1.
-    pub name: HashMap<LanguageCode, String>,
+    pub name: HashMap<String, String>,
     /// Preferred language of the name. Must be in ISO 639-1.
     pub default_language: LanguageCode,
 }
