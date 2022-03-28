@@ -11,6 +11,7 @@ mq = ["lapin", "tokio-reactor-trait", "tokio-executor-trait"]
 eyre = "0.6"
 futures-util = { version = "0.3", features = ["sink"] }
 isolanguage-1 = { version = "0.2", features = ["serde"] }
+itertools = "0.10"
 lapin = { version = "2.0", optional = true }
 mongodb = { version = "2.2.0-beta", features = ["bson-uuid-0_8"] }
 serde = { version = "1.0", features = ["derive"] }

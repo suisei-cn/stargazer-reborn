@@ -137,7 +137,7 @@ async fn bililive_task(uid: u64, entity_id: Uuid, mq: &MessageQueue) -> Result<(
                         Ok(room) => {
                             let event =
                                 Event::from_serializable("bililive", entity_id.into(), room)?;
-                            if let Err(error) = mq.publish(event).await {
+                            if let Err(error) = mq.publish(event, &[]).await {
                                 error!(?error, "Failed to publish bililive event");
                             };
                         }
