@@ -1,6 +1,9 @@
 //! Message queue for workers.
 
+use std::iter;
+
 use eyre::Result;
+use itertools::Itertools;
 use lapin::options::{BasicPublishOptions, ExchangeDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind};
@@ -49,13 +52,13 @@ impl MessageQueue {
     ///
     /// # Errors
     /// Returns an error if the message can't be published.
-    pub async fn publish(&self, event: Event) -> Result<()> {
+    pub async fn publish(&self, event: Event, middlewares: &[&str]) -> Result<()> {
         info!(event_id = %event.id, event_kind = %event.kind, "Publishing event");
         drop(
             self.channel
                 .basic_publish(
                     "stargazer-reborn",
-                    "events",
+                    &iter::once(&"event").chain(middlewares).join("."),
                     BasicPublishOptions::default(),
                     &*serde_json::to_vec(&event)?,
                     BasicProperties::default(),

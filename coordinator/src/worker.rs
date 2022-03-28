@@ -187,7 +187,7 @@ impl WorkerGroupImpl {
                 if task.worker == Some(id) {
                     task.worker = None;
                 }
-            })
+            });
         } else {
             // Add the worker to the ring.
             self.ring.insert(id);

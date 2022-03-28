@@ -147,7 +147,7 @@ async fn twitter_task(
             let event = Event::from_serializable("twitter", entity_id.into(), tweet)?;
 
             // Send tweet to message queue.
-            if let Err(error) = mq.publish(event).await {
+            if let Err(error) = mq.publish(event, &[]).await {
                 error!(?error, %tweet_id, "Failed to publish tweet");
             }
         }
