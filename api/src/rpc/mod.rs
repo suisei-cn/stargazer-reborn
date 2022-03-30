@@ -22,6 +22,8 @@
 //! }
 //! ```
 //!
+//! Here is [all defined methods](models)
+//!
 //! A [`Request`] is always bind with a [`Response`] type.
 //! Handler for this request will return the corresponding [`Response`] object,
 //! or an [`ApiError`] object represent an error during handling the request.
@@ -99,6 +101,8 @@ macro_rules! methods {
     )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+            #[doc = concat!("Request param of RPC method `", stringify!($method), "`.")]
+            #[doc = ""]
             $( #[ $method_meta ] )*
             pub struct $req {
                 $(
@@ -123,6 +127,7 @@ macro_rules! methods {
             }
 
             $(
+                #[doc = concat!("Response of RPC method [`", stringify!($method), "`](", stringify!($req), ").")]
                 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
                 pub struct $resp {
                     $(
@@ -170,6 +175,20 @@ macro_rules! methods {
         }
 
     };
+}
+
+macro_rules! calculated_doc {
+    (
+        $(
+            $doc:expr
+        )*
+    ) => (
+        $(
+
+            #[doc = $doc]
+
+        )*
+    );
 }
 
 /// Implement [`Response`] for a series of types.
