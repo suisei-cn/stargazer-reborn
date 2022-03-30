@@ -64,7 +64,7 @@ pub mod models;
 /// # use api::methods; use sg_core::models::User;
 ///  methods! {
 ///     // If response object has fields, define it and implement `Response` for it.
-///     "getUserSettings" := GetUserSettings {
+///     get_user := GetUserSettings {
 ///         user_id: String
 ///     } -> UserSettings {
 ///         settings: String
@@ -72,7 +72,7 @@ pub mod models;
 ///
 ///     // If response object is defined elsewhere, do not add brace.
 ///     // This will only implement the trait instead of re-define it.
-///     "getUser" := GetUser {
+///     get_user := GetUser {
 ///         user_id: String
 ///     } -> User
 /// }
@@ -176,9 +176,11 @@ macro_rules! methods {
 /// All of them are successful.
 ///
 /// # Example
-/// ```rust, no_run
+/// ```rust
+/// # use api::successful_response;
+/// #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 /// struct Foo { foo: String };
-///
+/// #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 /// struct Bar { bar: usize };
 ///
 /// successful_response![Foo, Bar];
@@ -207,7 +209,7 @@ mod test_macro {
     };
 
     crate::methods! {
-        getUser :=
+        get_user :=
         GetUser {
             user_id: String
         } -> User {
@@ -218,12 +220,12 @@ mod test_macro {
 
     #[test]
     fn test_gen() {
-        assert_eq!(GetUser::METHOD, "getUser");
+        assert_eq!(GetUser::METHOD, "get_user");
     }
 
     #[test]
     fn test_parse_param() {
-        let req = r#"{"method":"getUser","params":{"user_id":"foo"}}"#;
+        let req = r#"{"method":"get_user","params":{"user_id":"foo"}}"#;
         let req_obj = GetUser {
             user_id: "foo".to_string(),
         };
@@ -231,7 +233,7 @@ mod test_macro {
 
         assert_eq!(req_wrapped, serde_json::from_str(req).unwrap());
 
-        let req = r#"{"method":"getUser","params":{"user_foo":"bar"}}"#;
+        let req = r#"{"method":"get_user","params":{"user_foo":"bar"}}"#;
 
         assert!(serde_json::from_str::<Requests>(req).is_err());
     }

@@ -1,4 +1,4 @@
-//! Wrapper for RPC calls. Includes wrapper for [`Request`](crate::rpc::Request) types and [`Response`] types.
+//! Wrapper for RPC calls. Includes wrapper for [`Request`](crate::rpc::Request) types and [`Response`](crate::rpc::Request) types.
 
 use std::ops::{Deref, DerefMut};
 
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{rpc::ApiError, timestamp};
 
+/// Wrapper for RPC request. Contains method name and param. For more information, see [module doc](index.html#request).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
 pub struct RequestObject<T> {
@@ -46,6 +47,7 @@ impl<T> DerefMut for RequestObject<T> {
     }
 }
 
+/// Wrapper for RPC response. Contains processed time, success indicator and payload. For more information, see [module doc](index.html#response).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
 pub struct ResponseObject<T> {
