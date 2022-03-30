@@ -15,7 +15,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sg_core::models::{Entity, EventFilter, Meta, Name, User};
 
 mod prep {
-    use std::{sync::Once, thread::available_parallelism, time::Duration};
+    use std::{sync::Once, thread::available_parallelism, time::Duration,env};
 
     use tracing::metadata::LevelFilter;
 
@@ -43,7 +43,7 @@ mod prep {
                     .block_on(serve_with_config(Config {
                         bind: "127.0.0.1:8080".parse().unwrap(),
                         token_timeout: Duration::from_secs(0),
-                        mongo_uri: "mongodb://192.168.1.53:27017".to_owned(),
+                        mongo_uri: env::var("MONGODB_URL").expect("MONGODB_URL is not se"),
                         ..Default::default()
                     }))
             });
@@ -318,7 +318,7 @@ fn test_admin() {
 
 #[tokio::test]
 async fn test_get_entity_from_db() {
-    let col = mongodb::Client::with_uri_str("mongodb://192.168.1.53:27017")
+    let col = mongodb::Client::with_uri_str(std::env::var("MONGODB_URL").unwrap())
         .await
         .unwrap()
         .database("stargazer-reborn")
