@@ -7,7 +7,6 @@ use crate::{
         ApiError, ApiResult, Request, Response,
     },
     server::Context,
-    validate_names,
 };
 
 use axum::response::{IntoResponse, Response as AxumResponse};
@@ -53,12 +52,12 @@ macro_rules! static_dispatch {
                 }
             )*
         Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
-        #[cfg(debug_assertions)]
-        #[allow(unreachable_patterns)]
-        n => {
-            tracing::warn!(method = ?n, "Method not implemented");
-            ApiError::internal_error().into_response()
-        },
+            #[cfg(debug_assertions)]
+            #[allow(unreachable_patterns)]
+            n => {
+                tracing::warn!(method = ?n, "Method not implemented");
+                ApiError::internal_error().into_response()
+            },
         }
     };
 }
@@ -93,7 +92,7 @@ async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
     let AddEntity { meta, tasks, token } = req;
 
     ctx.validate_token(token)?.ensure_admin()?;
-    validate_names(meta.name.name.keys().map(AsRef::as_ref))?;
+
     tracing::info!(meta = ?meta);
 
     let mut ent = Entity {
@@ -124,7 +123,6 @@ async fn update_entity(req: UpdateEntity, ctx: Context) -> ApiResult<Entity> {
     } = req;
 
     ctx.validate_token(token)?.ensure_admin()?;
-    validate_names(meta.name.name.keys().map(AsRef::as_ref))?;
 
     let ser = to_bson(&meta).map_err(|_| ApiError::bad_request("Invalid meta"))?;
 
