@@ -134,16 +134,28 @@ async fn main() -> Result<()> {
 
     let client = mongodb::Client::with_uri_str(env::var("MONGODB_URL")?).await?;
     let db = client.database("stargazer-reborn");
-    let users = db.collection::<User>("users");
 
     // for count in (10..=400).step_by(10).chain((600..=1600).step_by(200)) {
-    {
+    if env::var("gen_user").is_ok() {
+        tracing::info!("Generating users");
+        let users = db.collection::<User>("users");
         let count = 100;
         let stat = get_avg_time_with_user_count(users.clone(), count).await?;
         let avg = stat.iter().sum::<u64>() as f64 / (10.0 * 1000.0);
         let max = *stat.iter().max().unwrap() as f64 / 1000.0;
         let min = *stat.iter().min().unwrap() as f64 / 1000.0;
         tracing::info!("{:-4}] {:.3}ms / {:.3}ms / {:.3}ms", count, avg, max, min);
+    }
+
+    if env::var("gen_ent").is_ok() {
+        tracing::info!("Generating entities");
+        let entities = db.collection::<Entity>("entities");
+        let count = 100;
+        let ent = std::iter::repeat(())
+            .take(count)
+            .map(|_| gen_entity())
+            .collect::<Vec<_>>();
+        entities.insert_many(&ent, None).await?;
     }
 
     Ok(())
