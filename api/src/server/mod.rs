@@ -4,7 +4,7 @@ use axum::{extract::Extension, routing::post, Json, Router};
 use color_eyre::Result;
 use http::Method;
 
-use crate::rpc::models::Requests;
+use crate::rpc::model::Requests;
 
 #[cfg(test)]
 mod test;

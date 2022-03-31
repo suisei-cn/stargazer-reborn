@@ -56,7 +56,7 @@
 
 mod_use::mod_use![wrapper, traits, error, ext];
 
-pub mod models;
+pub mod model;
 
 /// A convenient macro to generate all RPC methods.
 ///

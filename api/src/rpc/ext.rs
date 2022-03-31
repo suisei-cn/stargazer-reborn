@@ -5,7 +5,7 @@ use sg_core::models::{Task, User};
 
 use crate::{
     map,
-    rpc::{models::AddTask, ApiError, ApiResult},
+    rpc::{model::AddTask, ApiError, ApiResult},
 };
 
 pub trait UserExt: Sized {

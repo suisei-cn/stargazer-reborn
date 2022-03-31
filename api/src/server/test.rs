@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::rpc::{
-    models::{
+    model::{
         AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewSession,
         Session, UpdateSetting,
     },

@@ -1,6 +1,6 @@
 use crate::{
     rpc::{
-        models::{
+        model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
             Entities, GetEntities, NewSession, Requests, Session, UpdateEntity, UpdateSetting,
         },
