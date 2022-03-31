@@ -98,9 +98,11 @@ impl Event {
 pub struct User {
     /// The unique identifier of the user. The same physical user in different IMs should have different id.
     pub id: Uuid,
-    /// The IM that the user is in.
+    /// The IM that the user is in, e.g. "tg" for telegram
     pub im: String,
-    /// Name of the user.
+    /// IM payload, e.g. Chat id in telegram
+    pub im_payload: String,
+    /// Display name of the user.
     pub name: String,
     /// Avatar of the user.
     pub avatar: Url,
