@@ -106,6 +106,10 @@ pub struct User {
     pub avatar: Url,
     /// Admin privilege of the user, this can be set via admin web ui.
     pub is_admin: bool,
+    /// List of bots created by this user.
+    /// If the user is not an admin, this will be empty, and thus not serialized by serde.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub bots: Vec<Uuid>,
     /// The events that the user is subscribed to.
     pub event_filter: EventFilter,
 }
