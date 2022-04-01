@@ -62,7 +62,7 @@
 use std::{collections::HashMap, env};
 
 use color_eyre::Result;
-use fake::{faker::name::en::Name as FakeName, Fake, Faker};
+use fake::{faker::name::en::Name as FakeName, Fake, Faker, StringFaker};
 use futures::StreamExt;
 use mongodb::{bson::doc, Collection};
 use rand::{
@@ -94,6 +94,7 @@ fn gen_user(event_filter: EventFilter) -> User {
         event_filter,
         avatar: "http://placekitten.com/114/514".parse().unwrap(),
         im: ["tg", "qq"].choose(&mut rng).unwrap().to_owned().to_owned(),
+        im_payload: Faker.fake(),
         is_admin: false,
     }
 }
