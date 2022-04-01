@@ -3,12 +3,14 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use mongodb::{
-    bson::{doc, Uuid},
+    bson::{doc, Document, Uuid},
+    options::{FindOneAndUpdateOptions, ReturnDocument},
     Client, Collection, Database,
 };
 use sg_core::models::{Entity, Group, Task, User};
 
 use crate::{
+    model::{Bot, BotInfo, UserQuery},
     rpc::{ApiError, ApiResult, UserExt},
     server::{config::Config, Claims, JWTContext},
 };
@@ -54,11 +56,35 @@ impl Context {
         self.db.collection(&self.config.groups_collection)
     }
 
-    pub async fn find_user(&self, id: &Uuid) -> Result<User, ApiError> {
+    pub fn bots(&self) -> Collection<Bot> {
+        self.db.collection(&self.config.bots_collection)
+    }
+
+    pub async fn find_user(&self, query: &UserQuery) -> Result<User, ApiError> {
         self.users()
-            .find_one(doc! { "id": id }, None)
+            .find_one(query.as_document(), None)
             .await?
-            .ok_or_else(|| ApiError::user_not_found(id))
+            .ok_or_else(|| query.as_error())
+    }
+
+    pub async fn del_user(&self, query: &UserQuery) -> Result<User, ApiError> {
+        self.users()
+            .find_one_and_delete(query.as_document(), None)
+            .await?
+            .ok_or_else(|| query.as_error())
+    }
+
+    pub async fn update_user(&self, query: &UserQuery, update: Document) -> Result<User, ApiError> {
+        self.users()
+            .find_one_and_update(
+                query.as_document(),
+                update,
+                FindOneAndUpdateOptions::builder()
+                    .return_document(ReturnDocument::After)
+                    .build(),
+            )
+            .await?
+            .ok_or_else(|| query.as_error())
     }
 
     pub async fn find_entity(&self, id: &Uuid) -> Result<Entity, ApiError> {
@@ -76,13 +102,15 @@ impl Context {
         }
     }
 
+    /// Validate a JWT token. This does not check for privilege.
+    /// To do so, use [`Claims::ensure_admin`](Claims::ensure_admin) or [`Claims::ensure_bot`](Claims::ensure_bot).
     pub fn validate_token(&self, token: impl AsRef<str>) -> ApiResult<Claims> {
         self.jwt.validate(token).map_err(|_| ApiError::bad_token())
     }
 
     pub async fn find_and_assert_token(&self, token: impl AsRef<str>) -> ApiResult<User> {
         let user_id = self.validate_token(&token)?.id();
-        self.find_user(&user_id).await
+        self.find_user(&UserQuery::ById { id: user_id }).await
     }
 
     pub async fn find_and_assert_admin(&self, token: impl AsRef<str>) -> ApiResult<User> {

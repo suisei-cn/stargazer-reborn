@@ -62,9 +62,7 @@ impl ApiError {
     pub fn unauthorized() -> Self {
         Self::new(vec![
             "Unauthorized".to_owned(),
-            "Token is valid but cannot be used with this user_id".to_owned(),
-            "Either because it requires admin privilege or your token does not belongs to you"
-                .to_owned(),
+            "Token is valid but does not have to sufficient privilege to access".to_owned(),
         ])
     }
 
@@ -74,6 +72,14 @@ impl ApiError {
 
     pub fn user_not_found(user_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
+    }
+
+    pub fn user_not_found_from_im(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
+        Self::new(vec![format!(
+            "Cannot find user with im `{}` and im_payload `{}`",
+            im.as_ref(),
+            im_payload.as_ref()
+        )])
     }
 
     pub fn entity_not_found(entity_id: &Uuid) -> Self {

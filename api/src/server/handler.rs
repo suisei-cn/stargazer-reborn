@@ -1,12 +1,13 @@
 use crate::{
+    model::{AdjustUserPrivilege, BotInfo, Bots, GetBots, Health, NewBot, Null, UserQuery},
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
-            Entities, GetEntities, NewSession, Requests, Session, UpdateEntity, UpdateSetting,
+            Entities, GetEntities, NewToken, Requests, Token, UpdateEntity, UpdateSetting,
         },
         ApiError, ApiResult, Request, Response,
     },
-    server::Context,
+    server::{Context, Privilege},
 };
 
 use axum::response::{IntoResponse, Response as AxumResponse};
@@ -15,7 +16,7 @@ use mongodb::{
     bson::{doc, to_bson, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
 };
-use sg_core::models::{self as m, Entity, EventFilter, Task, User};
+use sg_core::models::{Entity, EventFilter, Task, User};
 
 fn assert_method<T: Request, M: Method<T>>(_: &M) {}
 
@@ -51,13 +52,17 @@ macro_rules! static_dispatch {
                     }
                 }
             )*
-        Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
-            #[cfg(debug_assertions)]
-            #[allow(unreachable_patterns)]
-            n => {
-                tracing::warn!(method = ?n, "Method not implemented");
-                ApiError::internal_error().into_response()
-            },
+
+            // Unknown method
+            Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
+
+            // Methods that has not been implemented
+            // #[cfg(debug_assertions)]
+            // #[allow(unreachable_patterns)]
+            // n => {
+            //     tracing::warn!(method = ?n, "Method not implemented");
+            //     ApiError::internal_error().into_response()
+            // },
         }
     };
 }
@@ -73,6 +78,7 @@ impl Requests {
     pub async fn handle(self, ctx: Context) -> AxumResponse {
         static_dispatch![
             self, ctx,
+            Health => health,
             GetEntities => get_entities,
             AddUser => add_user,
             AddEntity => add_entity,
@@ -82,10 +88,36 @@ impl Requests {
             DelEntity => del_entity,
             DelTask => del_task,
             UpdateEntity => update_entity,
-            NewSession => new_session,
+            NewBot => new_bot,
+            NewToken => new_token,
+            GetBots => get_bots,
             UpdateSetting => update_setting,
+            AdjustUserPrivilege => adjust_user_privilege,
         ]
     }
+}
+
+async fn health(_: Health, _: Context) -> ApiResult<Null> {
+    Ok(Null)
+}
+
+async fn get_bots(req: GetBots, ctx: Context) -> ApiResult<Bots> {
+    todo!()
+}
+
+async fn new_bot(req: NewBot, ctx: Context) -> ApiResult<BotInfo> {
+    todo!()
+}
+async fn adjust_user_privilege(req: AdjustUserPrivilege, ctx: Context) -> ApiResult<User> {
+    ctx.validate_token(&req.token)?.ensure_admin()?;
+
+    ctx.update_user(
+        &req.query,
+        doc! {
+            "is_admin": req.is_admin,
+        },
+    )
+    .await
 }
 
 async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
@@ -222,13 +254,16 @@ async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
         .find_one_and_update(
             doc! { "id": user_id },
             doc! { "$set": { "event_filter": serialized } },
-            None,
+            FindOneAndUpdateOptions::builder()
+                .return_document(ReturnDocument::After)
+                .build(),
         )
         .await?
         .ok_or_else(|| ApiError::user_not_found(&user_id))
 }
 
-async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
+async fn get_entities(req: GetEntities, ctx: Context) -> ApiResult<Entities> {
+    ctx.validate_token(req.token)?;
     let (vtbs, groups) = try_join(
         async { ctx.entities().find(None, None).await?.try_collect().await },
         async { ctx.groups().find(None, None).await?.try_collect().await },
@@ -241,15 +276,17 @@ async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
 async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
     let AddUser {
         im,
+        im_payload,
         avatar,
-        password,
+        token,
         name,
     } = req;
 
-    ctx.auth_password(password)?;
+    ctx.validate_token(token)?.ensure_bot()?;
 
-    let user = m::User {
+    let user = User {
         im,
+        im_payload,
         avatar,
         name,
         is_admin: false,
@@ -266,19 +303,15 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
 }
 
 async fn del_user(req: DelUser, ctx: Context) -> ApiResult<User> {
-    let DelUser { password, user_id } = req;
+    let DelUser { token, query } = req;
 
-    ctx.auth_password(password)?;
-    ctx.find_user(&user_id).await?;
-    ctx.users()
-        .find_one_and_delete(doc! { "id": user_id }, None)
-        .await?
-        .ok_or_else(|| ApiError::user_not_found(&user_id))
+    ctx.validate_token(token)?.ensure_bot()?;
+    ctx.del_user(&query).await
 }
 
-async fn auth_user(AuthUser { token, user_id }: AuthUser, ctx: Context) -> ApiResult<Authorized> {
-    let claims = ctx.validate_token(&token)?;
-    let user = ctx.find_user(&user_id).await?;
+async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
+    let claims = ctx.validate_token(&req.token)?;
+    let user = ctx.find_user(&UserQuery::ById { id: claims.id() }).await?;
 
     Ok(Authorized {
         user,
@@ -286,18 +319,20 @@ async fn auth_user(AuthUser { token, user_id }: AuthUser, ctx: Context) -> ApiRe
     })
 }
 
-async fn new_session(req: NewSession, ctx: Context) -> ApiResult<Session> {
-    let NewSession {
-        ref user_id,
-        password,
-    } = req;
+async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
+    let NewToken { query, token } = &req;
 
-    ctx.auth_password(password)?;
+    ctx.validate_token(token)?.ensure_bot()?;
 
-    // make sure user exists
-    let user = ctx.find_user(user_id).await?;
+    let user = ctx.find_user(query).await?;
 
-    let (token, claim) = match ctx.jwt.encode(user_id, user.is_admin) {
+    let prv = if user.is_admin {
+        Privilege::Admin
+    } else {
+        Privilege::User
+    };
+
+    let (token, claim) = match ctx.jwt.encode(&user.id, prv) {
         Ok(token) => token,
         Err(e) => {
             tracing::error!(error = %e, "Failed to generate token");
@@ -305,7 +340,7 @@ async fn new_session(req: NewSession, ctx: Context) -> ApiResult<Session> {
         }
     };
 
-    Ok(Session {
+    Ok(Token {
         token,
         valid_until: claim.valid_until(),
     })

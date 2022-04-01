@@ -177,21 +177,7 @@ macro_rules! methods {
     };
 }
 
-macro_rules! calculated_doc {
-    (
-        $(
-            $doc:expr
-        )*
-    ) => (
-        $(
-
-            #[doc = $doc]
-
-        )*
-    );
-}
-
-/// Implement [`Response`] for a series of types.
+/// Implement [`Response`] for a series of types.s
 /// All of them are successful.
 ///
 /// # Example

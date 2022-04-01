@@ -1,0 +1,59 @@
+use mongodb::bson::{doc, Document, Uuid};
+
+use crate::ApiError;
+
+/// Two ways of query a user:
+///
+/// - By IM: use `im` and `im_payload` to find the corresponding user. This is usually used by the bot.
+/// - By ID: use `id` to find the corresponding user. This is usually used by the admin.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum UserQuery {
+    ById { id: Uuid },
+    ByIm { im: String, im_payload: String },
+}
+
+impl UserQuery {
+    pub fn as_document(&self) -> Document {
+        match self {
+            UserQuery::ById { id } => doc! { "id": id },
+            UserQuery::ByIm { im, im_payload } => doc! { "im": im, "im_payload": im_payload },
+        }
+    }
+
+    pub fn as_error(&self) -> ApiError {
+        match self {
+            UserQuery::ById { id } => ApiError::user_not_found(id),
+            UserQuery::ByIm { im, im_payload } => ApiError::user_not_found_from_im(im, im_payload),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use mongodb::bson::Uuid;
+
+    use crate::model::UserQuery;
+
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+
+    struct Test {
+        #[serde(flatten)]
+        query: UserQuery,
+    }
+
+    #[test]
+    fn test_user_query() {
+        let obj = serde_json::json!({
+            "id": "5e9f8f8f-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+        });
+
+        let test: Test = serde_json::from_value(obj).unwrap();
+        assert_eq!(
+            test.query,
+            UserQuery::ById {
+                id: Uuid::parse_str("5e9f8f8f-f8f8-f8f8-f8f8-f8f8f8f8f8f8").unwrap()
+            }
+        );
+    }
+}
