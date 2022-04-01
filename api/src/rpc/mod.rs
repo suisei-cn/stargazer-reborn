@@ -1,4 +1,4 @@
-//! RPC definitions. Contains all the RPC methods and models, but does not have any implemtentation.
+//! RPC definitions. Contains all the RPC methods and model, but does not have any implemtentation.
 //! For server, see [`rpc::server`](../server/index.html).
 //! For client, see [`rpc::client`](../client/index.html).
 //!
@@ -11,24 +11,16 @@
 //! **This trait Requires [`DeserializeOwned`](serde::de::DeserializeOwned)**
 //!
 //! Used to define a request object which represents a request body sent from client to server.
-//! This is usually being represented in JSON as a struct looks like:
 //!
-//! ```json
-//! {
-//!    "method": "getUser",
-//!    "params": {
-//!         "user_id": "7765d13c-35f8-4294-bb6b-6b63b4a4be4d"
-//!    }
-//! }
-//! ```
+//! In order to invoke the method, send a POST http request to "/v1/:method_name" with request param as the body.
 //!
-//! Here is [all defined methods](models)
+//! Here is [all defined methods](model)
 //!
 //! A [`Request`] is always bind with a [`Response`] type.
 //! Handler for this request will return the corresponding [`Response`] object,
 //! or an [`ApiError`] object represent an error during handling the request.
 //!
-//! For server, a convenient enum [`Requests`](models::Requests) is generated
+//! For server, a convenient enum [`Requests`](model::Requests) is generated
 //! alone with all request objects to be deserialized from incoming JSON.
 //!
 //! ### Response
@@ -49,10 +41,10 @@
 //! - Define a request struct for each RPC method.
 //! - Implement [`Request`] for that request struct.
 //! - If response object has fields, define it and implement [`Response`] for it.
-//! - Generate an enum [`Requests`](models::Requests) with all request objects.
+//! - If `client` feature is enabled, generate methods for [`Client`](crate::client::Client) to invoke RPC methods.
 //!
 //! **Notice**: This macro **MUST** only be called once in the module,
-//! otherwise duplicate definitions of [`Requests`](models::Requests) will be generated.
+//! otherwise duplicate definitions of [`Requests`](model::Requests) will be generated.
 
 mod_use::mod_use![wrapper, traits, error, ext];
 
@@ -63,7 +55,7 @@ pub mod model;
 /// # Example
 ///
 /// ```rust
-/// # use api::methods; use sg_core::models::User;
+/// # use api::methods; use sg_core::model::User;
 ///  methods! {
 ///     // If response object has fields, define it and implement `Response` for it.
 ///     get_user := GetUserSettings {
@@ -169,25 +161,28 @@ macro_rules! methods {
             )*
         }
 
-        #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
-        #[serde(tag = "method", content = "params")]
-        #[serde(rename_all = "snake_case")]
-        #[non_exhaustive]
-        pub enum Requests {
-            $( $req($req), )*
-            #[serde(other)]
-            Unknown
-        }
+        #[cfg(any(feature = "client", feature = "client_blocking"))]
+        use $crate::{ApiResult, client::Result as ClientResult};
 
         #[cfg(feature = "client")]
         impl $crate::client::Client {
             $(
-                pub async fn $method (&self, req: $req) -> ::std::result::Result<crate::ApiResult<$resp>, $crate::client::Error> {
-                    self.invoke(req).await
+                $( #[ $method_meta ] )*
+                pub async fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
+                    self.invoke($req { $( $req_field_name, )* }).await
                 }
             )*
         }
 
+        #[cfg(feature = "client_blocking")]
+        impl $crate::client::blocking::Client {
+            $(
+                $( #[ $method_meta ] )*
+                pub fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
+                    self.invoke($req { $( $req_field_name, )* })
+                }
+            )*
+        }
     };
 }
 
@@ -240,21 +235,6 @@ mod test_macro {
     #[test]
     fn test_gen() {
         assert_eq!(GetUser::METHOD, "get_user");
-    }
-
-    #[test]
-    fn test_parse_param() {
-        let req = r#"{"method":"get_user","params":{"user_id":"foo"}}"#;
-        let req_obj = GetUser {
-            user_id: "foo".to_string(),
-        };
-        let req_wrapped = Requests::GetUser(req_obj);
-
-        assert_eq!(req_wrapped, serde_json::from_str(req).unwrap());
-
-        let req = r#"{"method":"get_user","params":{"user_foo":"bar"}}"#;
-
-        assert!(serde_json::from_str::<Requests>(req).is_err());
     }
 
     #[test]

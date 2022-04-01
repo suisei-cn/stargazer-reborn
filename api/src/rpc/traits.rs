@@ -1,22 +1,13 @@
-use serde::{de::DeserializeOwned, Serialize};
-
-use crate::rpc::{RequestObject, ResponseObject};
+use crate::rpc::ResponseObject;
 
 /// Represent request invocation. For more information, see [module doc](index.html#request).
-pub trait Request: DeserializeOwned {
+pub trait Request {
     const METHOD: &'static str;
     type Res: Response;
-
-    fn packed(self) -> RequestObject<Self> {
-        RequestObject {
-            method: Self::METHOD.to_owned(),
-            params: self,
-        }
-    }
 }
 
 /// Represent returned response data. For more information, see [module doc](index.html#response1).
-pub trait Response: Serialize + Sized {
+pub trait Response: Sized {
     fn is_successful(&self) -> bool;
 
     fn packed(self) -> ResponseObject<Self> {

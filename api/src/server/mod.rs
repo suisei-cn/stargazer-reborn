@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use axum::{extract::Extension, routing::post, Json, Router};
+use axum::extract::Extension;
 use color_eyre::Result;
 use http::Method;
-
-use crate::rpc::model::Requests;
 
 #[cfg(test)]
 mod test;
@@ -29,11 +27,7 @@ pub async fn serve_with_config(config: Config) -> Result<()> {
 
     let trace_layer = tower_http::trace::TraceLayer::new_for_http();
 
-    let app = Router::new()
-        .route(
-            "/v1",
-            post(|Json(req): Json<Requests>, Extension(ctx): Extension<Context>| req.handle(ctx)),
-        )
+    let app = get_router()
         .layer(Extension(ctx))
         .layer(cors_layer)
         .layer(trace_layer)

@@ -3,14 +3,14 @@ use crate::{
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
-            Entities, GetEntities, NewToken, Requests, Token, UpdateEntity, UpdateSetting,
+            Entities, GetEntities, NewToken, Token, UpdateEntity, UpdateSetting,
         },
         ApiError, ApiResult, Request, Response,
     },
     server::{Context, Privilege},
 };
 
-use axum::response::{IntoResponse, Response as AxumResponse};
+use axum::{response::IntoResponse, Router};
 use futures::{future::try_join, Future, TryStreamExt};
 use mongodb::{
     bson::{doc, to_bson, Uuid},
@@ -31,70 +31,53 @@ where
 {
 }
 
-macro_rules! static_dispatch {
-    ($self:ident, $ctx:ident, $( $req_variant: ident => $func: expr $(,)? )* ) => {
+macro_rules! routes {
+    ($( $req_variant: ident => $func: expr $(,)? )+ ) => {{
+        use $crate::rpc::Request;
+        use ::axum::{extract::Extension, routing::post, Json, Router};
 
-        match $self {
-            $(
-                Requests::$req_variant(req) => {
-                    ::tracing::debug!(
-                        method = stringify!($req_variant),
-                        params = ?req,
-                        "Income request"
-                    );
+        Router::new()
+        $(
+           .route(
+                &("/v1/".to_owned() + $req_variant::METHOD),
+                post(|Json(req): Json<$req_variant>, Extension(ctx): Extension<Context>| async {
+                    // ::tracing::debug!(
+                    //     method = stringify!($req_variant),
+                    //     params = ?req,
+                    //     "Income request"
+                    // );
                     let func = $func;
                     assert_method::<$req_variant, _>(&func);
-                    match func(req, $ctx).await {
+                    match func(req, ctx).await {
                         Ok(res) => {
                             res.packed().into_response()
                         },
                         Err(e) => e.packed().into_response(),
                     }
-                }
-            )*
-
-            // Unknown method
-            Self::Unknown => ApiError::bad_request("Unknown method").packed().into_response(),
-
-            // Methods that has not been implemented
-            // #[cfg(debug_assertions)]
-            // #[allow(unreachable_patterns)]
-            // n => {
-            //     tracing::warn!(method = ?n, "Method not implemented");
-            //     ApiError::internal_error().into_response()
-            // },
-        }
-    };
+                }),
+            )
+        )+
+    }};
 }
 
-impl Requests {
-    /// Dispatch the request to the appropriate handler.
-    ///
-    /// # Unimplemented methods
-    /// Under debug mode, unimplemented methods will compile,
-    /// return an internal error and log a warning message during runtime.
-    ///
-    /// While in release mode, unimplemented methods will simply not compile.
-    pub async fn handle(self, ctx: Context) -> AxumResponse {
-        static_dispatch![
-            self, ctx,
-            Health => health,
-            GetEntities => get_entities,
-            AddUser => add_user,
-            AddEntity => add_entity,
-            AddTask => add_task,
-            AuthUser => auth_user,
-            DelUser => del_user,
-            DelEntity => del_entity,
-            DelTask => del_task,
-            UpdateEntity => update_entity,
-            NewBot => new_bot,
-            NewToken => new_token,
-            GetBots => get_bots,
-            UpdateSetting => update_setting,
-            AdjustUserPrivilege => adjust_user_privilege,
-        ]
-    }
+pub fn get_router() -> Router {
+    routes![
+        Health => health,
+        GetEntities => get_entities,
+        AddUser => add_user,
+        AddEntity => add_entity,
+        AddTask => add_task,
+        AuthUser => auth_user,
+        DelUser => del_user,
+        DelEntity => del_entity,
+        DelTask => del_task,
+        UpdateEntity => update_entity,
+        NewBot => new_bot,
+        NewToken => new_token,
+        GetBots => get_bots,
+        UpdateSetting => update_setting,
+        AdjustUserPrivilege => adjust_user_privilege,
+    ]
 }
 
 async fn health(_: Health, _: Context) -> ApiResult<Null> {

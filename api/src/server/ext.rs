@@ -1,5 +1,6 @@
 use crate::rpc::{ApiError, Response, ResponseObject};
 use axum::{http::StatusCode, response::Response as AxumResponse, Json};
+use serde::Serialize;
 
 impl axum::response::IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
@@ -22,7 +23,10 @@ impl From<mongodb::error::Error> for ApiError {
     }
 }
 
-impl<R: Response> axum::response::IntoResponse for ResponseObject<R> {
+impl<R: Response> axum::response::IntoResponse for ResponseObject<R>
+where
+    R: Serialize,
+{
     fn into_response(self) -> AxumResponse {
         let status = if self.success {
             StatusCode::OK

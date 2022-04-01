@@ -6,47 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{rpc::ApiError, timestamp};
 
-/// Wrapper for RPC request. Contains method name and param. For more information, see [module doc](index.html#request).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[must_use]
-pub struct RequestObject<T> {
-    pub method: String,
-    pub params: T,
-}
-
-impl<T: Serialize> RequestObject<T> {
-    pub fn new(method: &str, params: T) -> Self {
-        Self {
-            method: method.to_string(),
-            params,
-        }
-    }
-
-    pub fn to_json(&self) -> String {
-        match serde_json::to_string(&self) {
-            Ok(res) => res,
-            Err(err) => {
-                tracing::error!("Failed to serialize response object: {}", err);
-                ApiError::internal_error().packed().to_json()
-            }
-        }
-    }
-}
-
-impl<T> Deref for RequestObject<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.params
-    }
-}
-
-impl<T> DerefMut for RequestObject<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.params
-    }
-}
-
 /// Wrapper for RPC response. Contains processed time, success indicator and payload. For more information, see [module doc](index.html#response).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
