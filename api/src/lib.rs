@@ -2,7 +2,7 @@ mod_use::mod_use![utils];
 
 pub mod rpc;
 
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", feature = "client_blocking"))]
 pub mod client;
 
 #[cfg(feature = "server")]

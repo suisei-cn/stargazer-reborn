@@ -6,6 +6,8 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("Serde Json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
+    #[error("Unable to parse url: {0}")]
+    Url(#[from] url::ParseError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

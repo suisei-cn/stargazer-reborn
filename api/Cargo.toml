@@ -44,6 +44,7 @@ once_cell = "1.10.0"
 
 [features]
 client = ["dep:reqwest", "dep:thiserror"]
+client_blocking = ["reqwest?/blocking"]
 server = ["dep:http", "dep:axum", "dep:tower-http", "dep:jsonwebtoken", "dep:tracing-subscriber", "dep:tokio", "mongodb/default", "dep:color-eyre"]
 gen_fake = ["dep:uuid", "dep:fake", "dep:rand", "dep:tokio", "dep:color-eyre", "dep:tracing-subscriber"]
 
