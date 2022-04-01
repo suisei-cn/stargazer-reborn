@@ -155,6 +155,20 @@ macro_rules! methods {
             )?
         )*
 
+        #[test]
+        fn test_requests_size() {
+            use ::std::mem::size_of;
+            $(
+                println!(
+                    "{} ({}B) -> {} ({}B)",
+                    stringify!($req),
+                    size_of::<$req>(),
+                    stringify!($resp),
+                    size_of::<$resp>()
+                );
+            )*
+        }
+
         #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
         #[serde(tag = "method", content = "params")]
         #[serde(rename_all = "snake_case")]
