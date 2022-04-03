@@ -596,6 +596,7 @@ dependencies = [
  "mongodb",
  "serde",
  "serde_json",
+ "tap",
  "tarpc",
  "thiserror",
  "tokio",
@@ -2820,6 +2821,22 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "translate"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "core",
+ "eyre",
+ "figment",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.9",
 ]
 
 [[package]]
