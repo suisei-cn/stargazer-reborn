@@ -14,7 +14,7 @@ use tracing::{error, info, trace};
 use uuid::Uuid;
 
 use sg_core::models::{Event, Task};
-use sg_core::mq::MessageQueue;
+use sg_core::mq::{MessageQueue, Middlewares};
 use sg_core::protocol::WorkerRpc;
 use sg_core::utils::ScopedJoinHandle;
 
@@ -137,7 +137,7 @@ async fn bililive_task(uid: u64, entity_id: Uuid, mq: &MessageQueue) -> Result<(
                         Ok(room) => {
                             let event =
                                 Event::from_serializable("bililive", entity_id.into(), room)?;
-                            if let Err(error) = mq.publish(event, &[]).await {
+                            if let Err(error) = mq.publish(event, Middlewares::default()).await {
                                 error!(?error, "Failed to publish bililive event");
                             };
                         }

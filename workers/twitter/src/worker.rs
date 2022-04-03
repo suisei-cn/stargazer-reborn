@@ -19,7 +19,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use sg_core::models::{Event, Task};
-use sg_core::mq::MessageQueue;
+use sg_core::mq::{MessageQueue, Middlewares};
 use sg_core::protocol::WorkerRpc;
 use sg_core::utils::ScopedJoinHandle;
 
@@ -147,7 +147,7 @@ async fn twitter_task(
             let event = Event::from_serializable("twitter", entity_id.into(), tweet)?;
 
             // Send tweet to message queue.
-            if let Err(error) = mq.publish(event, &[]).await {
+            if let Err(error) = mq.publish(event, Middlewares::default()).await {
                 error!(?error, %tweet_id, "Failed to publish tweet");
             }
         }
