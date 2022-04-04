@@ -1,12 +1,12 @@
 use eyre::{Result, WrapErr};
 use futures_util::StreamExt;
-use tracing::{error, info};
+use tracing::error;
 use tracing_subscriber::EnvFilter;
 
 use sg_core::mq::{MessageQueue, RabbitMQ};
 
 use crate::config::Config;
-use crate::translate::{BaiduTranslator, Translator};
+use crate::translate::{BaiduTranslator, MockTranslator, Translator};
 
 mod config;
 mod translate;
@@ -20,7 +20,14 @@ async fn main() -> Result<()> {
 
     let config = Config::from_env().wrap_err("Failed to load config from environment variables")?;
 
-    let translator = BaiduTranslator::new(config.baidu_app_id, config.baidu_app_secret);
+    let translator: Box<dyn Translator> = if config.debug {
+        Box::new(MockTranslator)
+    } else {
+        Box::new(BaiduTranslator::new(
+            config.baidu_app_id,
+            config.baidu_app_secret,
+        ))
+    };
 
     let mq = RabbitMQ::new(&config.amqp_url, &config.amqp_exchange)
         .await
@@ -29,7 +36,6 @@ async fn main() -> Result<()> {
     let mut consumer = mq.consume(Some("translate")).await;
 
     while let Some(Ok((next, event))) = consumer.next().await {
-        info!(event_id = %event.id, ?next, "Received event");
         let event = match translator.translate_event(event.clone()).await {
             Ok(translated) => translated,
             Err(e) => {
