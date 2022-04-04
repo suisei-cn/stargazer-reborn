@@ -1,21 +1,19 @@
 //! Message queue for workers.
 
-use std::{iter, vec};
-
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use std::{iter, vec};
 
 use eyre::Result;
 use futures_util::{future, stream, Stream, StreamExt};
 use itertools::Itertools;
-use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, Consumer, ExchangeKind};
 use lapin::options::{
     BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions, QueueBindOptions,
     QueueDeclareOptions,
 };
 use lapin::types::FieldTable;
-
+use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, Consumer, ExchangeKind};
 use tap::TapFallible;
 use tracing::{debug, error, info};
 
@@ -38,14 +36,14 @@ impl MessageQueue {
                 .with_executor(tokio_executor_trait::Tokio::current())
                 .with_reactor(tokio_reactor_trait::Tokio),
         )
-            .await?
-            .create_channel()
-            .await?;
+        .await?
+        .create_channel()
+        .await?;
 
         debug!("Declaring exchange");
         channel
             .exchange_declare(
-                "events",
+                "stargazer-reborn",
                 ExchangeKind::Topic,
                 ExchangeDeclareOptions {
                     durable: true,
@@ -63,12 +61,14 @@ impl MessageQueue {
     /// # Errors
     /// Returns an error if the message can't be published.
     pub async fn publish(&self, event: Event, middlewares: Middlewares) -> Result<()> {
-        info!(event_id = %event.id, event_kind = %event.kind, "Publishing event");
+        info!(event_id = %event.id, event_kind = %event.kind, ?middlewares, "Publishing event");
         drop(
             self.channel
                 .basic_publish(
                     "stargazer-reborn",
-                    &iter::once(String::from("event")).chain(middlewares.into_iter()).join("."),
+                    &iter::once(String::from("event"))
+                        .chain(middlewares.into_iter())
+                        .join("."),
                     BasicPublishOptions::default(),
                     &*serde_json::to_vec(&event)?,
                     BasicProperties::default(),
@@ -119,19 +119,17 @@ impl MessageQueue {
     pub async fn consume(
         &self,
         middleware: Option<&str>,
-    ) -> impl Stream<Item=Result<(Middlewares, Event)>> + Unpin {
+    ) -> impl Stream<Item = Result<(Middlewares, Event)>> + Unpin {
         let consumer = self.consume_connect(middleware).await;
         info!(middleware = ?middleware, "Listening for events.");
         match consumer {
             Ok(consumer) => future::Either::Left(consumer.map(|msg| match msg {
-                Ok(msg) => {
-                    Ok((
-                        Middlewares::from_routing_key(msg.routing_key.as_str()),
-                        serde_json::from_slice(&msg.data).tap_err(|e| {
-                            error!(routing_key = %msg.routing_key, error = ?e, "Failed to parse event");
-                        })?,
-                    ))
-                }
+                Ok(msg) => Ok((
+                    Middlewares::from_routing_key(msg.routing_key.as_str()),
+                    serde_json::from_slice(&msg.data).tap_err(|e| {
+                        error!(routing_key = %msg.routing_key, error = ?e, "Failed to parse event");
+                    })?,
+                )),
                 Err(e) => {
                     error!(error = ?e, "Error consuming message.");
                     Err(e.into())
@@ -150,7 +148,8 @@ pub struct Middlewares {
 
 impl Middlewares {
     /// Obtain a middleware set from a routing key, removing its first and last component.
-    #[must_use] pub fn from_routing_key(s: &str) -> Self {
+    #[must_use]
+    pub fn from_routing_key(s: &str) -> Self {
         let mut middlewares: Vec<_> = s.split('.').skip(1).map(ToString::to_string).collect();
         middlewares.pop();
         Self { middlewares }
@@ -161,7 +160,9 @@ impl FromStr for Middlewares {
     type Err = Infallible;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(Self { middlewares: s.split('.').map(ToString::to_string).collect() })
+        Ok(Self {
+            middlewares: s.split('.').map(ToString::to_string).collect(),
+        })
     }
 }
 
