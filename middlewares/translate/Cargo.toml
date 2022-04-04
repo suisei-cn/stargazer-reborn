@@ -23,4 +23,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = "0.8"
 
 [dev-dependencies]
+assert_cmd = "2.0"
 figment = { version = "0.10", features = ["env", "test"] }

@@ -7,7 +7,7 @@ use tracing::warn;
 use sg_core::models::Event;
 
 #[async_trait]
-pub trait Translator {
+pub trait Translator: Send + Sync {
     async fn translate_event(&self, mut event: Event) -> Result<Event> {
         let translate_fields: Vec<_> = event
             .fields
@@ -86,25 +86,23 @@ impl Translator for BaiduTranslator {
     }
 }
 
+pub struct MockTranslator;
+
+#[async_trait]
+impl Translator for MockTranslator {
+    async fn translate_text(&self, text: &str) -> Result<String> {
+        Ok(format!("test{}", text))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use eyre::Result;
     use serde_json::json;
     use uuid::Uuid;
 
     use sg_core::models::Event;
 
-    use crate::translate::{BaiduTranslator, Translator};
-
-    struct MockTranslator;
-
-    #[async_trait]
-    impl Translator for MockTranslator {
-        async fn translate_text(&self, text: &str) -> Result<String> {
-            Ok(format!("test{}", text))
-        }
-    }
+    use crate::translate::{BaiduTranslator, MockTranslator, Translator};
 
     #[tokio::test]
     async fn must_translate_fields() {

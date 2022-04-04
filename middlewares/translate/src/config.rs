@@ -16,6 +16,8 @@ pub struct Config {
     pub baidu_app_id: usize,
     /// Baidu translate app secret.
     pub baidu_app_secret: String,
+    /// Debug only.
+    pub debug: bool,
 }
 
 impl Config {
@@ -37,6 +39,7 @@ impl Default for Config {
             amqp_exchange: String::from("stargazer-reborn"),
             baidu_app_id: 0,
             baidu_app_secret: String::new(),
+            debug: false,
         }
     }
 }
@@ -62,6 +65,7 @@ mod tests {
             jail.set_env("MIDDLEWARE_AMQP_EXCHANGE", "some_exchange");
             jail.set_env("MIDDLEWARE_BAIDU_APP_ID", "1");
             jail.set_env("MIDDLEWARE_BAIDU_APP_SECRET", "<secret>");
+            jail.set_env("MIDDLEWARE_DEBUG", "true");
             assert_eq!(
                 Config::from_env().unwrap(),
                 Config {
@@ -69,6 +73,7 @@ mod tests {
                     amqp_exchange: String::from("some_exchange"),
                     baidu_app_id: 1,
                     baidu_app_secret: String::from("<secret>"),
+                    debug: true,
                 }
             );
             Ok(())
