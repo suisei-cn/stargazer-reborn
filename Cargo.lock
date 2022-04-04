@@ -1469,6 +1469,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+
+[[package]]
 name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2824,6 +2830,28 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "translate"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "color-eyre",
+ "core",
+ "eyre",
+ "figment",
+ "futures-util",
+ "md5",
+ "once_cell",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.10",
+ "uuid",
 ]
 
 [[package]]
