@@ -1,2 +1,2 @@
 [workspace]
-members = ["auth", "coordinator", "core", "workers/twitter", "workers/bililive"]
+members = ["auth", "coordinator", "core", "middlewares/translate", "workers/bililive", "workers/twitter"]

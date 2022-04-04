@@ -25,6 +25,9 @@ pub struct Tweet {
     pub link: String,
     /// Whether the tweet is a retweet.
     pub is_rt: bool,
+    /// Fields to be translated.
+    #[serde(rename = "x-translate-fields")]
+    pub x_translate_fields: Vec<String>,
 }
 
 impl From<RawTweet> for Tweet {
@@ -48,6 +51,7 @@ impl From<RawTweet> for Tweet {
                 tweet.id
             ),
             is_rt: tweet.retweeted_status.is_some(),
+            x_translate_fields: vec!["/text".into()],
         }
     }
 }
