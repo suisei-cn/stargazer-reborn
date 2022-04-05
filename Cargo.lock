@@ -244,9 +244,10 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 name = "auth"
 version = "0.1.0"
 dependencies = [
- "futures",
  "mod_use",
  "mongodb",
+ "password-hash",
+ "pbkdf2 0.11.0",
  "serde",
  "serde_json",
  "thiserror",
@@ -279,6 +280,12 @@ name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
+name = "base64ct"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dea908e7347a8c64e378c17e30ef880ad73e3b4498346b055c2c00ea342f3179"
 
 [[package]]
 name = "bililive"
@@ -1500,7 +1507,7 @@ dependencies = [
  "lazy_static",
  "md-5",
  "os_info",
- "pbkdf2",
+ "pbkdf2 0.10.1",
  "percent-encoding",
  "rand",
  "rustls",
@@ -1762,12 +1769,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "password-hash"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa26fd5c3cd6e6bb83dd9c0cef40fbeb77d7596339ca46c18a6f66919bb07769"
+dependencies = [
+ "base64ct",
+ "rand_core",
+ "subtle",
+]
+
+[[package]]
 name = "pbkdf2"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "271779f35b581956db91a3e55737327a03aa051e90b1c47aeb189508533adfd7"
 dependencies = [
  "digest 0.10.3",
+]
+
+[[package]]
+name = "pbkdf2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
+dependencies = [
+ "digest 0.10.3",
+ "hmac 0.12.1",
+ "password-hash",
+ "sha2",
 ]
 
 [[package]]

@@ -1,60 +1,91 @@
 use mongodb::{
     bson::{doc, to_bson},
     options::UpdateOptions,
-    results::UpdateResult,
     Collection, Cursor,
+};
+use pbkdf2::{
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+    Pbkdf2,
 };
 
 mod_use::mod_use![model, error];
 
+#[derive(Clone, Debug)]
+pub struct AuthClient {
+    pub(crate) collection: Collection<PermissionRecord>,
+}
+
 impl AuthClient {
-    pub fn new(col: Collection<PermissionRecord>) -> AuthClient {
-        AuthClient { col }
+    pub fn new(collection: Collection<PermissionRecord>) -> AuthClient {
+        AuthClient { collection }
+    }
+
+    pub fn into_collection(self) -> Collection<PermissionRecord> {
+        self.collection
     }
 
     pub async fn list(&self) -> Result<Cursor<PermissionRecord>> {
-        self.col.find(None, None).await.map_err(Into::into)
+        self.collection.find(None, None).await.map_err(Into::into)
     }
 
     pub async fn count(&self) -> Result<u64> {
         if cfg!(debug_assertions) {
-            self.col.count_documents(None, None).await
+            self.collection.count_documents(None, None).await
         } else {
-            self.col.estimated_document_count(None).await
+            self.collection.estimated_document_count(None).await
         }
         .map_err(Into::into)
     }
 
-    pub async fn insert_record(&self, record: PermissionRecord) -> Result<UpdateResult> {
+    pub async fn new_record(
+        &self,
+        username: impl Into<String>,
+        password: &[u8],
+        permission: PermissionSet,
+    ) -> Result<bool> {
+        let username = username.into();
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Pbkdf2.hash_password(password, &salt)?;
+
+        let record = PermissionRecord::new(hash, username, permission);
+
         let doc = to_bson(&record)?;
-        self.col
+        let res = self
+            .collection
             .update_one(
                 doc! {
-                  "username" : record.username
+                  "username" : &record.username
                 },
                 doc! {
                  "$setOnInsert": doc
                 },
                 UpdateOptions::builder().upsert(true).build(),
             )
-            .await
-            .map_err(Into::into)
+            .await?;
+
+        Ok(res.upserted_id.is_some())
     }
 
-    pub async fn validate(&self, username: &str, hash: &str) -> Result<bool> {
-        let doc = doc! {
-            "username": username,
-            "hash": hash
+    /// Look up permission of a user by username and password.
+    pub async fn look_up(
+        &self,
+        username: impl AsRef<str>,
+        password: &[u8],
+    ) -> Result<PermissionSet> {
+        let res = self
+            .collection
+            .find_one(doc! { "username": username.as_ref() }, None)
+            .await?;
+        let res = match res {
+            Some(rec) if rec.validate(password).is_ok() => rec.permissions,
+            _ => PermissionSet::EMPTY,
         };
-        let cursor = self.col.find_one(doc, None).await?;
-        Ok(cursor.is_some())
+        Ok(res)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use futures::{future::ready, StreamExt};
-
     use crate::*;
 
     #[tokio::test]
@@ -65,38 +96,37 @@ mod test {
         let db = client.database("test");
         let col = db.collection("permissions");
         col.drop(None).await.unwrap();
+
+        // Begin testing
         let client = AuthClient::new(col);
-        let record = PermissionRecord {
-            username: "test".to_string(),
-            hash: "test".to_string(),
-            permissions: PermissionSet {
-                api: Some(Permission::ReadOnly),
-                method: Some(Permission::ReadWrite),
-                coordinator: None,
-            },
+        let username = "test_user";
+        let password = b"test_password";
+        let per = PermissionSet {
+            api: Some(Permission::ReadOnly),
+            method: Some(Permission::ReadWrite),
+            coordinator: None,
         };
-        let res = client.insert_record(record.clone()).await.unwrap();
-        assert!(res.upserted_id.is_some());
-        assert_eq!(res.matched_count, 0);
-        assert_eq!(res.modified_count, 0);
+        // New record will be inserted
+        let inserted = client.new_record(username, password, per).await.unwrap();
+        assert!(inserted);
 
-        client
-            .list()
-            .await
-            .unwrap()
-            .for_each(|record| {
-                println!("{:?}", record);
-                println!("{}", serde_json::to_string(&record.unwrap()).unwrap());
-                ready(())
-            })
-            .await;
+        // Duplicate record should not be inserted
+        let inserted = client.new_record(username, password, per).await.unwrap();
+        assert!(!inserted);
 
-        let res = client.insert_record(record).await.unwrap();
-
+        // Now should have one record in db
         let c = client.count().await.unwrap();
-        assert!(res.upserted_id.is_none());
-        assert_eq!(res.matched_count, 1);
-        assert_eq!(res.modified_count, 0);
-        assert_eq!(c, 1)
+        assert_eq!(c, 1);
+
+        // Valid username and hash combination should return correct permissions
+        let res = client.look_up(username, password).await.unwrap();
+        assert_eq!(res, per);
+
+        // Invalid username and hash combination should return empty permissions
+        let res = client.look_up(username, b"bad_password").await.unwrap();
+        assert_eq!(res, PermissionSet::empty());
+
+        // Clean up
+        client.into_collection().drop(None).await.unwrap();
     }
 }
