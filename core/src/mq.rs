@@ -159,12 +159,15 @@ impl MessageQueue for RabbitMQ {
         info!(middleware = ?middleware, "Listening for events.");
         match consumer {
             Ok(consumer) => Box::pin(consumer.map(|msg| match msg {
-                Ok(msg) => Ok((
-                    Middlewares::from_routing_key(msg.routing_key.as_str()),
-                    serde_json::from_slice(&msg.data).tap_err(|e| {
+                Ok(msg) => {
+                    let next = Middlewares::from_routing_key(msg.routing_key.as_str());
+                    let event: Event = serde_json::from_slice(&msg.data).tap_err(|e| {
                         error!(routing_key = %msg.routing_key, error = ?e, "Failed to parse event");
-                    })?,
-                )),
+                    })?;
+
+                    info!(routing_key = %msg.routing_key, event_id = %event.id, "Received event");
+                    Ok((next, event))
+                }
                 Err(e) => {
                     error!(error = ?e, "Error consuming message.");
                     Err(e.into())
