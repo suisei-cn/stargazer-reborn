@@ -31,6 +31,11 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      rmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
