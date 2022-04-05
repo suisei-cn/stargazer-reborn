@@ -46,12 +46,12 @@ impl PermissionRecord {
     }
 
     /// Note that this function parse hash with default encoding.
-    /// This is fine as long as the hash is generated with [`Pbkdf2::hash_password`]
+    /// This is fine as long as the hash is generated with [`Argon::hash_password`]
     /// since it's using [`Output::init_with`], which calls [`Encoding::default`].
     ///
     /// To use a different encoding, use [`decode_with`].
     ///
-    /// [`Pbkdf2::hash_password`]: pbkdf2::Pbkdf2
+    /// [`Argon::hash_password`]: argon2::Argon2
     /// [`Output::init_with`]: password_hash::Output::init_with
     /// [`decode_with`]: Self::decode_with
     pub fn decode(&self) -> Result<PasswordHash> {

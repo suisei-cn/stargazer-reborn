@@ -9,7 +9,7 @@ pub enum Error {
     Bson(#[from] mongodb::bson::ser::Error),
 
     #[error("Argon error: {0}")]
-    Pbkdf2(#[from] argon2::password_hash::Error),
+    Argon(#[from] argon2::password_hash::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
