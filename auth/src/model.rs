@@ -1,5 +1,4 @@
-use mongodb::bson::doc;
-use password_hash::{Encoding, PasswordHash, PasswordVerifier};
+use argon2::password_hash::{Encoding, PasswordHash};
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
@@ -64,15 +63,6 @@ impl PermissionRecord {
     /// This will normally not be needed since hash generated should all be using the default encoding, which is base64.
     pub fn decode_with(&self, encoding: Encoding) -> Result<PasswordHash> {
         PasswordHash::parse(&self.hash, encoding).map_err(Into::into)
-    }
-
-    /// Validate if a password is correct
-    pub fn validate(&self, password: &[u8]) -> Result<()> {
-        let hash = self.decode()?;
-
-        pbkdf2::Pbkdf2
-            .verify_password(password, &hash)
-            .map_err(Into::into)
     }
 }
 
