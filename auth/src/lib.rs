@@ -1,6 +1,6 @@
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2, PasswordVerifier,
+    Argon2, PasswordHash, PasswordVerifier,
 };
 use mongodb::{
     bson::{doc, to_bson},
@@ -10,13 +10,18 @@ use mongodb::{
 
 mod_use::mod_use![model, error];
 
+/// Provides marjor functions that one will need.
+///
+/// This is the primary type for using the `auth` module.
+/// It will interact with the database, generate and validate records.
 #[derive(Clone)]
 pub struct AuthClient {
-    pub(crate) collection: Collection<PermissionRecord>,
+    collection: Collection<PermissionRecord>,
     argon: Argon2<'static>,
 }
 
 impl AuthClient {
+    /// Create a new [`AuthClient`] with the given [`Collection`].
     pub fn new(collection: Collection<PermissionRecord>) -> AuthClient {
         AuthClient {
             collection,
@@ -24,14 +29,28 @@ impl AuthClient {
         }
     }
 
-    pub fn into_collection(self) -> Collection<PermissionRecord> {
-        self.collection
+    /// Get the inner [`Collection`].
+    pub fn collection(&self) -> Collection<PermissionRecord> {
+        self.collection.clone()
     }
 
+    /// List all records in the database.
     pub async fn list(&self) -> Result<Cursor<PermissionRecord>> {
         self.collection.find(None, None).await.map_err(Into::into)
     }
 
+    /// Return the count of records in the database.
+    ///
+    /// In debug mode, this will do a more expensive but accurate [`count_documents`].
+    /// In release mode, this will use [`estimated_document_count`],
+    /// which returns metadata of the database without actually call a `find`.
+    ///
+    /// For more detail, see document of [`count`] and [`countDocuments`] of mongodb.
+    ///
+    /// [`count_documents`]: Collection::count_documents
+    /// [`estimated_document_count`]: Collection::estimated_document_count
+    /// [`count`]: https://www.mongodb.com/docs/manual/reference/method/db.collection.count/
+    /// [`countDocuments`]: https://www.mongodb.com/docs/manual/reference/method/db.collection.countDocuments/
     pub async fn count(&self) -> Result<u64> {
         if cfg!(debug_assertions) {
             self.collection.count_documents(None, None).await
@@ -43,7 +62,8 @@ impl AuthClient {
 
     /// Try insert a new record.
     ///
-    /// Return wether the record is inserted. If one record with same username exists, this will not insert.
+    /// Return wether the record is inserted.
+    /// If one record with same username exists, this will leave it intact.
     pub async fn new_record(
         &self,
         username: impl Into<String>,
@@ -61,7 +81,7 @@ impl AuthClient {
             .collection
             .update_one(
                 doc! {
-                  "username" : &record.username
+                  "username" : record.username()
                 },
                 doc! {
                  "$setOnInsert": doc
@@ -74,6 +94,8 @@ impl AuthClient {
     }
 
     /// Look up permission of a user by username and password.
+    ///
+    /// When the username and password combination are invalid, this will return [`PermissionSet::EMPTY`].
     pub async fn look_up(
         &self,
         username: impl AsRef<str>,
@@ -84,17 +106,16 @@ impl AuthClient {
             .find_one(doc! { "username": username.as_ref() }, None)
             .await?;
         let res = match res {
-            Some(rec) if self.validate(&rec, password).is_ok() => rec.permissions,
+            Some(rec) if self.validate(&rec.decode()?, password).is_ok() => rec.permissions(),
             _ => PermissionSet::EMPTY,
         };
         Ok(res)
     }
 
     /// Validate if a password is correct
-    pub fn validate(&self, record: &PermissionRecord, password: &[u8]) -> Result<()> {
-        let hash = record.decode()?;
+    pub fn validate(&self, hash: &PasswordHash, password: &[u8]) -> Result<()> {
         self.argon
-            .verify_password(password, &hash)
+            .verify_password(password, hash)
             .map_err(Into::into)
     }
 }
@@ -102,6 +123,7 @@ impl AuthClient {
 #[cfg(test)]
 mod test {
     use crate::*;
+
     #[tokio::test]
     async fn test_db() {
         let client = mongodb::Client::with_uri_str(
@@ -142,7 +164,7 @@ mod test {
 
         // Record in DB should not be modified
         let record = client.list().await.unwrap().next().await.unwrap().unwrap();
-        assert_eq!(record.permissions, per);
+        assert_eq!(record.permissions(), per);
 
         // Valid username and hash combination should return correct permissions
         let res = client.look_up(username, password).await.unwrap();
@@ -157,7 +179,7 @@ mod test {
         assert_eq!(res, PermissionSet::empty());
 
         // Clean up
-        client.into_collection().drop(None).await.unwrap();
+        client.collection().drop(None).await.unwrap();
     }
 
     use futures::StreamExt;
