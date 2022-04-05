@@ -133,7 +133,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
     color_eyre::install()?;
 
-    let client = mongodb::Client::with_uri_str(env::var("MONGODB_URL")?).await?;
+    let client = mongodb::Client::with_uri_str(env::var("MONGODB_URI")?).await?;
     let db = client.database("stargazer-reborn");
 
     // for count in (10..=400).step_by(10).chain((600..=1600).step_by(200)) {

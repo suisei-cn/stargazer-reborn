@@ -318,7 +318,7 @@
 
 // #[tokio::test]
 // async fn test_get_entity_from_db() {
-//     let col = mongodb::Client::with_uri_str(std::env::var("MONGODB_URL").unwrap())
+//     let col = mongodb::Client::with_uri_str(std::env::var("MONGODB_URI").unwrap())
 //         .await
 //         .unwrap()
 //         .database("stargazer-reborn")
