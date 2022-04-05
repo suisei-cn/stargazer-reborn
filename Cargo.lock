@@ -243,6 +243,15 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 [[package]]
 name = "auth"
 version = "0.1.0"
+dependencies = [
+ "futures",
+ "mod_use",
+ "mongodb",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "autocfg"
@@ -1463,6 +1472,12 @@ checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "mod_use"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f5c8279ccdb8c122713aacb8f90c6ffa748542b6995a85d0b2e71b751218517"
 
 [[package]]
 name = "mongodb"
