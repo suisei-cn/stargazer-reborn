@@ -1,3 +1,7 @@
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+#![warn(clippy::all)]
+
 mod_use::mod_use![utils];
 
 pub mod rpc;
