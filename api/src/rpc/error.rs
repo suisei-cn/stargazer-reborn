@@ -99,10 +99,10 @@ impl ApiError {
     }
 }
 
-pub type ApiResult<T> = Result<T, ApiError>;
-
 impl Response for ApiError {
     fn is_successful(&self) -> bool {
         false
     }
 }
+
+pub type ApiResult<T> = Result<T, ApiError>;

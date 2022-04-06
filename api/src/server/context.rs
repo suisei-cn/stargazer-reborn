@@ -10,7 +10,7 @@ use mongodb::{
 use sg_core::models::{Entity, Group, Task, User};
 
 use crate::{
-    model::{Bot, BotInfo, UserQuery},
+    model::{Bot, UserQuery},
     rpc::{ApiError, ApiResult, UserExt},
     server::{config::Config, Claims, JWTContext},
 };

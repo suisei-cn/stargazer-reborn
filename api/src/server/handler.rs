@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     model::{AdjustUserPrivilege, BotInfo, Bots, GetBots, Health, NewBot, Null, UserQuery},
     rpc::{
@@ -5,79 +7,56 @@ use crate::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
             Entities, GetEntities, NewToken, Token, UpdateEntity, UpdateSetting,
         },
-        ApiError, ApiResult, Request, Response,
+        ApiError, ApiResult,
     },
-    server::{Context, Privilege},
+    server::{Config, Context, JWTContext, Privilege, RouterExt},
 };
 
-use axum::{response::IntoResponse, Router};
-use futures::{future::try_join, Future, TryStreamExt};
+use axum::{extract::Extension, Router};
+use color_eyre::Result;
+use futures::{future::try_join, TryStreamExt};
+use http::Method;
 use mongodb::{
     bson::{doc, to_bson, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
 };
 use sg_core::models::{Entity, EventFilter, Task, User};
+use tower_http::{cors, trace};
 
-fn assert_method<T: Request, M: Method<T>>(_: &M) {}
+pub(crate) async fn make_app(config: Config) -> Result<Router> {
+    let config = Arc::new(config);
 
-/// Marker trait to ensure handlers are in a good shape.
-pub(crate) trait Method<Req: Request> {}
+    let cors_layer = cors::CorsLayer::new()
+        .allow_methods(vec![Method::POST])
+        .allow_credentials(true)
+        .allow_origin(cors::Any);
+    let trace_layer = trace::TraceLayer::new_for_http();
 
-impl<Req, M, F> Method<Req> for M
-where
-    Req: Request,
-    F: Future<Output = ApiResult<Req::Res>>,
-    M: FnOnce(Req, Context) -> F,
-{
-}
+    let jwt = Arc::new(JWTContext::new(&config));
 
-macro_rules! routes {
-    ($( $req_variant: ident => $func: expr $(,)? )+ ) => {{
-        use $crate::rpc::Request;
-        use ::axum::{extract::Extension, routing::post, Json, Router};
+    let ctx = Context::new(jwt, config).await?;
 
-        Router::new()
-        $(
-           .route(
-                &("/v1/".to_owned() + $req_variant::METHOD),
-                post(|Json(req): Json<$req_variant>, Extension(ctx): Extension<Context>| async {
-                    // ::tracing::debug!(
-                    //     method = stringify!($req_variant),
-                    //     params = ?req,
-                    //     "Income request"
-                    // );
-                    let func = $func;
-                    assert_method::<$req_variant, _>(&func);
-                    match func(req, ctx).await {
-                        Ok(res) => {
-                            res.packed().into_response()
-                        },
-                        Err(e) => e.packed().into_response(),
-                    }
-                }),
-            )
-        )+
-    }};
-}
+    let app = Router::new()
+        .mount(health)
+        .mount(get_entities)
+        .mount(add_user)
+        .mount(add_entity)
+        .mount(add_task)
+        .mount(auth_user)
+        .mount(del_user)
+        .mount(del_entity)
+        .mount(del_task)
+        .mount(update_entity)
+        .mount(new_bot)
+        .mount(new_token)
+        .mount(get_bots)
+        .mount(update_setting)
+        .mount(adjust_user_privilege)
+        .layer(Extension(ctx))
+        .layer(cors_layer)
+        .layer(trace_layer);
 
-pub fn get_router() -> Router {
-    routes![
-        Health => health,
-        GetEntities => get_entities,
-        AddUser => add_user,
-        AddEntity => add_entity,
-        AddTask => add_task,
-        AuthUser => auth_user,
-        DelUser => del_user,
-        DelEntity => del_entity,
-        DelTask => del_task,
-        UpdateEntity => update_entity,
-        NewBot => new_bot,
-        NewToken => new_token,
-        GetBots => get_bots,
-        UpdateSetting => update_setting,
-        AdjustUserPrivilege => adjust_user_privilege,
-    ]
+    Ok(app)
 }
 
 async fn health(_: Health, _: Context) -> ApiResult<Null> {
