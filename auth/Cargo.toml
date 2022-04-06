@@ -1,0 +1,17 @@
+[package]
+name = "auth"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+argon2 = { version = "0.4", features = ["std"] }
+mod_use = "0.2"
+mongodb = { version = "2.2.0-beta", features = ["bson-uuid-0_8"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+futures = "0.3"
+serde_json = "1.0"
+tokio = { version = "1.17", features = ["macros"] }
