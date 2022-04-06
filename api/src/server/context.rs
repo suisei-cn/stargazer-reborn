@@ -15,9 +15,10 @@ use crate::{
     server::{config::Config, Claims, JWTContext},
 };
 
-#[derive(Debug, Clone)]
 /// Context being shared between handlers. This will be cloned every time a handler is called.
 /// So all underlineing data should be wrapped in Arc or similar shared reference thingy.
+#[must_use]
+#[derive(Debug, Clone)]
 pub struct Context {
     /// DB instance. Since DB is composed of [`Collection`](mongodb::Collection)s, cloning is cheap.
     pub(crate) db: Database,
@@ -28,7 +29,10 @@ pub struct Context {
 }
 
 /// Context of the server. Contains the configuration and database handle.
+
 impl Context {
+    /// # Errors
+    /// Fail on invalid database url.
     pub async fn new(jwt: Arc<JWTContext>, config: Arc<Config>) -> Result<Self> {
         let client = Client::with_uri_str(&config.mongo_uri).await?;
         let db = client.database(&config.mongo_db);
@@ -40,26 +44,33 @@ impl Context {
         Self { db, jwt, config }
     }
 
+    #[must_use]
     pub fn users(&self) -> Collection<User> {
         self.db.collection(&self.config.users_collection)
     }
 
+    #[must_use]
     pub fn tasks(&self) -> Collection<Task> {
         self.db.collection(&self.config.tasks_collection)
     }
 
+    #[must_use]
     pub fn entities(&self) -> Collection<Entity> {
         self.db.collection(&self.config.entities_collection)
     }
 
+    #[must_use]
     pub fn groups(&self) -> Collection<Group> {
         self.db.collection(&self.config.groups_collection)
     }
 
+    #[must_use]
     pub fn bots(&self) -> Collection<Bot> {
         self.db.collection(&self.config.bots_collection)
     }
 
+    /// # Errors
+    /// Fail on database error or user not found
     pub async fn find_user(&self, query: &UserQuery) -> Result<User, ApiError> {
         self.users()
             .find_one(query.as_document(), None)
@@ -67,6 +78,8 @@ impl Context {
             .ok_or_else(|| query.as_error())
     }
 
+    /// # Errors
+    /// Fail on database error or user not found
     pub async fn del_user(&self, query: &UserQuery) -> Result<User, ApiError> {
         self.users()
             .find_one_and_delete(query.as_document(), None)
@@ -74,6 +87,8 @@ impl Context {
             .ok_or_else(|| query.as_error())
     }
 
+    /// # Errors
+    /// Fail on database error or user not found
     pub async fn update_user(&self, query: &UserQuery, update: Document) -> Result<User, ApiError> {
         self.users()
             .find_one_and_update(
@@ -87,6 +102,8 @@ impl Context {
             .ok_or_else(|| query.as_error())
     }
 
+    /// # Errors
+    /// Fail on database error or entity not found
     pub async fn find_entity(&self, id: &Uuid) -> Result<Entity, ApiError> {
         self.entities()
             .find_one(doc! { "id": id }, None)
@@ -94,26 +111,35 @@ impl Context {
             .ok_or_else(|| ApiError::entity_not_found(id))
     }
 
+    /// # Errors
+    /// Fail on incorrect password
     pub fn auth_password(&self, password: impl AsRef<str>) -> Result<(), ApiError> {
-        if password.as_ref() != self.config.bot_password {
-            Err(ApiError::wrong_password())
-        } else {
+        if password.as_ref() == self.config.bot_password {
             Ok(())
+        } else {
+            Err(ApiError::wrong_password())
         }
     }
 
     /// Validate a JWT token. This does not check for privilege.
     /// To do so, use [`Claims::ensure_admin`](Claims::ensure_admin) or [`Claims::ensure_bot`](Claims::ensure_bot).
+    ///
+    /// # Errors
+    /// Fails on invalid or expired token.
     pub fn validate_token(&self, token: impl AsRef<str>) -> ApiResult<Claims> {
         self.jwt.validate(token).map_err(|_| ApiError::bad_token())
     }
 
-    pub async fn find_and_assert_token(&self, token: impl AsRef<str>) -> ApiResult<User> {
+    /// # Errors
+    /// Fail on bad token, database error or user not exist.
+    pub async fn find_and_assert_token(&self, token: impl AsRef<str> + Send) -> ApiResult<User> {
         let user_id = self.validate_token(&token)?.id();
         self.find_user(&UserQuery::ById { id: user_id }).await
     }
 
-    pub async fn find_and_assert_admin(&self, token: impl AsRef<str>) -> ApiResult<User> {
+    /// # Errors
+    /// Fail on bad token, database error, user not exist or user is not admin.
+    pub async fn find_and_assert_admin(&self, token: impl AsRef<str> + Send) -> ApiResult<User> {
         self.find_and_assert_token(token).await?.assert_admin()
     }
 }

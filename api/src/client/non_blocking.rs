@@ -13,6 +13,10 @@ pub struct Client {
 }
 
 impl Client {
+    /// Creates new client instance.
+    ///
+    /// # Errors
+    /// Fails on invalid URL.
     pub fn new(url: impl IntoUrl) -> Result<Self> {
         Ok(Self {
             client: reqwest::Client::new(),
@@ -20,9 +24,13 @@ impl Client {
         })
     }
 
+    /// Invoke an RPC method.
+    ///
+    /// # Errors
+    /// Fails on invalid `Request` method, bad request body, network issue or bad response.
     pub async fn invoke<R>(&self, req: R) -> Result<ApiResult<R::Res>>
     where
-        R: Request + Serialize,
+        R: Request + Serialize + Send + Sync,
         R::Res: DeserializeOwned,
     {
         Ok(self

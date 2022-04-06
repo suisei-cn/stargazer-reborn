@@ -44,6 +44,7 @@ pub struct ApiError {
 }
 
 impl ApiError {
+    #[must_use]
     pub fn new(error: Vec<String>) -> Self {
         Self { error }
     }
@@ -52,6 +53,7 @@ impl ApiError {
         ResponseObject::error(self)
     }
 
+    #[must_use]
     pub fn bad_token() -> Self {
         Self::new(vec![
             "Bad token".to_owned(),
@@ -59,6 +61,7 @@ impl ApiError {
         ])
     }
 
+    #[must_use]
     pub fn unauthorized() -> Self {
         Self::new(vec![
             "Unauthorized".to_owned(),
@@ -66,10 +69,12 @@ impl ApiError {
         ])
     }
 
+    #[must_use]
     pub fn wrong_password() -> Self {
         Self::new(vec!["Wrong password".to_owned()])
     }
 
+    #[must_use]
     pub fn user_not_found(user_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
     }
@@ -82,10 +87,12 @@ impl ApiError {
         )])
     }
 
+    #[must_use]
     pub fn entity_not_found(entity_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find entity with ID `{}`", entity_id)])
     }
 
+    #[must_use]
     pub fn task_not_found(task_id: &Uuid) -> Self {
         Self::new(vec![format!("Cannot find task with ID `{}`", task_id)])
     }
@@ -94,7 +101,8 @@ impl ApiError {
         Self::new(vec!["Bad request".to_owned(), error.into()])
     }
 
-    pub fn internal_error() -> Self {
+    #[must_use]
+    pub fn internal() -> Self {
         Self::new(vec!["Internal Error".to_owned()])
     }
 }

@@ -12,7 +12,7 @@
 //!
 //! Used to define a request object which represents a request body sent from client to server.
 //!
-//! In order to invoke the method, send a POST http request to "/v1/:method_name" with request param as the body.
+//! In order to invoke the method, send a POST http request to `/v1/:method_name` with request param as the body.
 //!
 //! Here is [all defined methods](model)
 //!
@@ -106,7 +106,8 @@ macro_rules! methods {
             impl $req {
                 #[inline]
                 #[allow(clippy::new_without_default)]
-                pub fn new($( $req_field_name : $req_field_type, )*) -> Self {
+                #[must_use]
+                pub const fn new($( $req_field_name : $req_field_type, )*) -> Self {
                     Self {
                         $( $req_field_name, )*
                     }
@@ -132,7 +133,8 @@ macro_rules! methods {
                 impl $resp {
                     #[inline]
                     #[allow(clippy::new_without_default)]
-                    pub fn new($( $resp_field_name : $resp_field_type, )*) -> Self {
+                    #[must_use]
+                    pub const fn new($( $resp_field_name : $resp_field_type, )*) -> Self {
                         Self {
                             $( $resp_field_name, )*
                         }
@@ -165,9 +167,15 @@ macro_rules! methods {
         use $crate::{ApiResult, client::Result as ClientResult};
 
         #[cfg(feature = "client")]
+        #[allow(clippy::missing_errors_doc)]
         impl $crate::client::Client {
             $(
                 $( #[ $method_meta ] )*
+                ///
+                /// # Errors
+                /// This returns a [`ClientResult`] that represents error occurred on client side,
+                /// like network error or serialization error.
+                /// It then wraps around an [`ApiResult`] which represents error occurred on server side.
                 pub async fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
                     self.invoke($req { $( $req_field_name, )* }).await
                 }
@@ -175,11 +183,17 @@ macro_rules! methods {
         }
 
         #[cfg(feature = "client_blocking")]
+        #[allow(clippy::missing_errors_doc)]
         impl $crate::client::blocking::Client {
             $(
                 $( #[ $method_meta ] )*
+                ///
+                /// # Errors
+                /// This returns a [`ClientResult`] that represents error occurred on client side,
+                /// like network error or serialization error.
+                /// It then wraps around an [`ApiResult`] which represents error occurred on server side.
                 pub fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
-                    self.invoke($req { $( $req_field_name, )* })
+                    self.invoke(& $req { $( $req_field_name, )* })
                 }
             )*
         }

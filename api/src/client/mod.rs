@@ -22,8 +22,8 @@ enum Shim<R> {
 impl<T> From<Shim<T>> for ApiResult<T> {
     fn from(shim: Shim<T>) -> Self {
         match shim {
-            Shim::Ok(res) => ApiResult::Ok(res),
-            Shim::Err(err) => ApiResult::Err(err),
+            Shim::Ok(res) => Self::Ok(res),
+            Shim::Err(err) => Self::Err(err),
         }
     }
 }

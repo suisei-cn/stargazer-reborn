@@ -14,6 +14,7 @@ pub enum AddTaskParam {
 }
 
 impl AddTaskParam {
+    #[must_use]
     pub fn into_task_with(self, entity_id: Uuid) -> Task {
         match self {
             AddTaskParam::Youtube { channel_id } => Task::new_youtube(channel_id, entity_id),

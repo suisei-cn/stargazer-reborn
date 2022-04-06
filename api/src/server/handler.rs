@@ -1,4 +1,6 @@
-use std::sync::Arc;
+#![allow(clippy::unused_async)]
+
+use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     model::{AdjustUserPrivilege, BotInfo, Bots, GetBots, Health, NewBot, Null, UserQuery},
@@ -23,7 +25,11 @@ use mongodb::{
 use sg_core::models::{Entity, EventFilter, Task, User};
 use tower_http::{cors, trace};
 
-pub(crate) async fn make_app(config: Config) -> Result<Router> {
+/// Construct the router.
+///
+/// # Errors
+/// Fails on invalid db url
+pub async fn make_app(config: Config) -> Result<Router> {
     let config = Arc::new(config);
 
     let cors_layer = cors::CorsLayer::new()
@@ -63,11 +69,11 @@ async fn health(_: Health, _: Context) -> ApiResult<Null> {
     Ok(Null)
 }
 
-async fn get_bots(req: GetBots, ctx: Context) -> ApiResult<Bots> {
+async fn get_bots(_req: GetBots, _ctx: Context) -> ApiResult<Bots> {
     todo!()
 }
 
-async fn new_bot(req: NewBot, ctx: Context) -> ApiResult<BotInfo> {
+async fn new_bot(_req: NewBot, _ctx: Context) -> ApiResult<BotInfo> {
     todo!()
 }
 async fn adjust_user_privilege(req: AdjustUserPrivilege, ctx: Context) -> ApiResult<User> {
@@ -225,7 +231,7 @@ async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
 }
 
 async fn get_entities(req: GetEntities, ctx: Context) -> ApiResult<Entities> {
-    ctx.validate_token(req.token)?;
+    let _ = ctx.validate_token(req.token)?;
     let (vtbs, groups) = try_join(
         async { ctx.entities().find(None, None).await?.try_collect().await },
         async { ctx.groups().find(None, None).await?.try_collect().await },
@@ -253,10 +259,10 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
         name,
         is_admin: false,
         event_filter: EventFilter {
-            entities: Default::default(),
-            kinds: Default::default(),
+            entities: HashSet::default(),
+            kinds: HashSet::default(),
         },
-        id: Default::default(),
+        id: Uuid::default(),
     };
 
     ctx.users().insert_one(&user, None).await?;
@@ -298,7 +304,7 @@ async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
         Ok(token) => token,
         Err(e) => {
             tracing::error!(error = %e, "Failed to generate token");
-            return Err(ApiError::internal_error());
+            return Err(ApiError::internal());
         }
     };
 

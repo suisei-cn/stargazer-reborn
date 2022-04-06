@@ -9,6 +9,10 @@ use crate::{
 };
 
 pub trait UserExt: Sized {
+    /// Assert a user is admin
+    ///
+    /// # Errors
+    /// Returns [`ApiError::Unauthorized`] if the user is not admin.
     fn assert_admin(self) -> ApiResult<Self>;
 }
 

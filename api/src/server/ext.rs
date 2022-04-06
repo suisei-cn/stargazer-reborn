@@ -14,7 +14,7 @@ use http::StatusCode;
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Marker trait to ensure handlers are in a good shape.
-pub(crate) trait Method<Req: Request, F: Future<Output = ApiResult<Req::Res>>> {
+pub trait Method<Req: Request, F: Future<Output = ApiResult<Req::Res>>> {
     fn invoke(self, ctx: Context, req: Req) -> F;
 }
 
@@ -29,7 +29,8 @@ where
     }
 }
 
-pub(crate) trait RouterExt {
+pub trait RouterExt {
+    #[must_use]
     fn mount<M, Req, Fut>(self, method: M) -> Self
     where
         M: Method<Req, Fut> + Send + Clone + 'static,
@@ -74,7 +75,7 @@ impl From<mongodb::error::Error> for ApiError {
     fn from(err: mongodb::error::Error) -> Self {
         let err_str = err.to_string();
         tracing::error!(error = err_str.as_str(), "Mongo error");
-        ApiError::internal_error()
+        Self::internal()
     }
 }
 

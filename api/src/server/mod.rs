@@ -5,6 +5,7 @@ mod test;
 
 mod_use::mod_use![config, handler, jwt, context, ext];
 
+#[allow(clippy::missing_errors_doc)]
 pub async fn serve_with_config(config: Config) -> Result<()> {
     tracing::debug!(config = ?config);
 
@@ -21,6 +22,7 @@ pub async fn serve_with_config(config: Config) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::missing_errors_doc)]
 pub async fn serve() -> Result<()> {
     serve_with_config(Config::from_env()?).await
 }

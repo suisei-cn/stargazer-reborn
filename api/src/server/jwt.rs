@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use std::{
     fmt::Debug,
     time::{Duration, SystemTime},
@@ -19,12 +21,15 @@ use crate::{
 /// - **User** can only access some API, mostly related to themselves.
 /// - **Bot** can access more API, include creating session for users.
 /// - **Admin** can access all API.
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Privilege {
     User,
     Bot,
     Admin,
 }
+
+#[must_use]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// The JWT claim. Contains the user id and the expiry time.
 pub struct Claims {
@@ -38,17 +43,20 @@ pub struct Claims {
 
 impl Claims {
     /// The `exp` of the token in [`SystemTime`].
+    #[must_use]
     pub fn valid_until(&self) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(self.exp as u64)
     }
 
     /// Expiration time of the token in Unix timestamp.
-    pub fn valid_until_timestamp(&self) -> usize {
+    #[must_use]
+    pub const fn valid_until_timestamp(&self) -> usize {
         self.exp
     }
 
     /// User id represented as [`Uuid`].
-    pub fn id(&self) -> Uuid {
+    #[must_use]
+    pub const fn id(&self) -> Uuid {
         Uuid::from_bytes(self.aud)
     }
 
@@ -74,6 +82,7 @@ impl Claims {
     }
 }
 
+#[must_use]
 #[derive(Clone)]
 pub struct JWTContext {
     timeout: Duration,
@@ -102,7 +111,9 @@ impl JWTContext {
         (SystemTime::now() + self.timeout)
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs() as usize
+            .as_secs()
+            .try_into()
+            .expect("Time went too far, or you're running on a 16-bit system?")
     }
 
     /// Encode the user id and corresponding privilege into a JWT token.
@@ -170,7 +181,7 @@ fn test_jwt() {
     println!("{}", token);
 
     // Valid and not expired
-    jwt.validate(&token).unwrap();
+    let _ = jwt.validate(&token).unwrap();
 
     std::thread::sleep(Duration::from_secs(2));
 

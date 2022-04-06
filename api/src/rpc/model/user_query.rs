@@ -14,6 +14,7 @@ pub enum UserQuery {
 }
 
 impl UserQuery {
+    #[must_use]
     pub fn as_document(&self) -> Document {
         match self {
             UserQuery::ById { id } => doc! { "id": id },
@@ -21,6 +22,7 @@ impl UserQuery {
         }
     }
 
+    #[must_use]
     pub fn as_error(&self) -> ApiError {
         match self {
             UserQuery::ById { id } => ApiError::user_not_found(id),

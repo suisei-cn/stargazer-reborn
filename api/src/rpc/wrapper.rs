@@ -22,7 +22,7 @@ impl<T> ResponseObject<T> {
     }
 
     #[inline]
-    pub fn with_time(data: T, success: bool, time: String) -> Self {
+    pub const fn with_time(data: T, success: bool, time: String) -> Self {
         Self {
             data,
             success,
@@ -41,12 +41,12 @@ impl<T> ResponseObject<T> {
     }
 
     #[inline]
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.success
     }
 
     #[inline]
-    pub fn is_error(&self) -> bool {
+    pub const fn is_error(&self) -> bool {
         !self.success
     }
 }
@@ -58,13 +58,17 @@ impl<T: Serialize> ResponseObject<T> {
             Ok(res) => res,
             Err(err) => {
                 tracing::error!("Failed to serialize response object: {}", err);
-                ApiError::internal_error().packed().to_json()
+                ApiError::internal().packed().to_json()
             }
         }
     }
 }
 
 impl<'a, T: Deserialize<'a>> ResponseObject<T> {
+    /// Deserializes response object from JSON string.
+    ///
+    /// # Errors
+    /// Returns [`serde_json::Error`] if deserialization fails.
     #[inline]
     pub fn try_from_json(json: &'a str) -> serde_json::error::Result<T> {
         serde_json::from_str(json)

@@ -62,7 +62,7 @@
 use std::{collections::HashMap, env};
 
 use color_eyre::Result;
-use fake::{faker::name::en::Name as FakeName, Fake, Faker, StringFaker};
+use fake::{faker::name::en::Name as FakeName, Fake, Faker};
 use futures::StreamExt;
 use mongodb::{bson::doc, Collection};
 use rand::{
