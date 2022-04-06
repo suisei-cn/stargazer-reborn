@@ -50,6 +50,12 @@ impl PermissionSet {
     }
 }
 
+impl Default for PermissionSet {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
 /// Record of user's permission set in the database.
 #[must_use]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +76,11 @@ impl PermissionRecord {
             username: username.into(),
             permissions,
         }
+    }
+
+    /// Get hash string
+    pub fn hash(&self) -> &str {
+        &self.hash
     }
 
     /// Get the username

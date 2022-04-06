@@ -4,7 +4,7 @@ use argon2::{
 };
 use mongodb::{
     bson::{doc, to_bson},
-    options::UpdateOptions,
+    options::{FindOneAndUpdateOptions, ReturnDocument, UpdateOptions},
     Collection, Cursor,
 };
 
@@ -93,6 +93,44 @@ impl AuthClient {
         Ok(res.upserted_id.is_some())
     }
 
+    /// Try insert a new record.
+    ///
+    /// Return wether the record is inserted.
+    /// If one record with same username exists, this will leave it intact.
+    pub async fn update_record(
+        &self,
+        username: impl AsRef<str>,
+        password: impl AsRef<[u8]>,
+        permission: PermissionSet,
+    ) -> Result<Option<PermissionSet>> {
+        let username = username.as_ref();
+        let password = password.as_ref();
+
+        // User not exist or does not have correct username/password combination
+        if self.look_up_impl(username, password).await?.is_none() {
+            return Ok(None);
+        }
+
+        let permission = to_bson(&permission)?;
+        let res = self
+            .collection
+            .find_one_and_update(
+                doc! {
+                  "username" : username,
+                },
+                doc! {
+                    "$set": { "permissions": permission }
+                },
+                FindOneAndUpdateOptions::builder()
+                    .return_document(ReturnDocument::After)
+                    .build(),
+            )
+            .await?
+            .map(|x| x.permissions());
+
+        Ok(res)
+    }
+
     /// Look up permission of a user by username and password.
     ///
     /// When the username and password combination are invalid, this will return [`PermissionSet::EMPTY`].
@@ -101,16 +139,25 @@ impl AuthClient {
         username: impl AsRef<str>,
         password: impl AsRef<[u8]>,
     ) -> Result<PermissionSet> {
-        let res = self
+        Ok(self
+            .look_up_impl(username.as_ref(), password.as_ref())
+            .await?
+            .unwrap_or_default())
+    }
+
+    async fn look_up_impl(&self, username: &str, password: &[u8]) -> Result<Option<PermissionSet>> {
+        let record = self
             .collection
-            .find_one(doc! { "username": username.as_ref() }, None)
+            .find_one(doc! { "username": username }, None)
             .await?;
-        let res = match res {
+
+        let res = match record {
             Some(rec) if self.validate(&rec.decode()?, password.as_ref()).is_ok() => {
-                rec.permissions()
+                Some(rec.permissions())
             }
-            _ => PermissionSet::EMPTY,
+            _ => None,
         };
+
         Ok(res)
     }
 
@@ -179,6 +226,16 @@ mod test {
         assert_eq!(res, PermissionSet::empty());
         let res = client.look_up("bad_username", b"bad_pw").await.unwrap();
         assert_eq!(res, PermissionSet::empty());
+
+        // Update record
+        let res = client
+            .update_record(username, password, PermissionSet::FULL)
+            .await
+            .unwrap();
+        assert_eq!(res, Some(PermissionSet::FULL));
+
+        let res = client.look_up(username, password).await.unwrap();
+        assert_eq!(res, PermissionSet::FULL);
 
         // Clean up
         client.collection().drop(None).await.unwrap();
