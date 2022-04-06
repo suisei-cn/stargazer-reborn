@@ -9,38 +9,40 @@ use axum::{
     response::{IntoResponse, Response as AxumResponse},
     routing::{post, Router},
 };
-use futures::{future::BoxFuture, Future};
+use futures::Future;
 use http::StatusCode;
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Marker trait to ensure handlers are in a good shape.
-pub(crate) trait Method<Req: Request>: Send + Clone + 'static {
-    fn invoke(self, ctx: Context, req: Req) -> BoxFuture<'static, ApiResult<Req::Res>>;
+pub(crate) trait Method<Req: Request, F: Future<Output = ApiResult<Req::Res>>> {
+    fn invoke(self, ctx: Context, req: Req) -> F;
 }
 
-impl<Req, M, F> Method<Req> for M
+impl<Req, Func, Fut> Method<Req, Fut> for Func
 where
     Req: Request,
-    F: Future<Output = ApiResult<Req::Res>> + Send + 'static,
-    M: Send + Clone + FnOnce(Req, Context) -> F + 'static,
+    Fut: Future<Output = ApiResult<Req::Res>>,
+    Func: FnOnce(Req, Context) -> Fut,
 {
-    fn invoke(self, ctx: Context, req: Req) -> BoxFuture<'static, ApiResult<Req::Res>> {
-        Box::pin(self(req, ctx))
+    fn invoke(self, ctx: Context, req: Req) -> Fut {
+        self(req, ctx)
     }
 }
 
 pub(crate) trait RouterExt {
-    fn mount<M, R>(self, method: M) -> Self
+    fn mount<M, Req, Fut>(self, method: M) -> Self
     where
-        M: Method<R>,
-        R: DeserializeOwned + Request + Send + 'static,
-        R::Res: Serialize;
+        M: Method<Req, Fut> + Send + Clone + 'static,
+        Fut: Future<Output = ApiResult<Req::Res>> + Send,
+        Req: DeserializeOwned + Request + Send + 'static,
+        Req::Res: Serialize;
 }
 
 impl RouterExt for Router<Body> {
-    fn mount<M, R>(self, method: M) -> Self
+    fn mount<M, R, F>(self, method: M) -> Self
     where
-        M: Method<R>,
+        M: Method<R, F> + Send + Clone + 'static,
+        F: Future<Output = ApiResult<R::Res>> + Send,
         R: DeserializeOwned + Request + Send + 'static,
         R::Res: Serialize,
     {
