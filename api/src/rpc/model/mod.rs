@@ -20,6 +20,23 @@ crate::methods! {
     /// Health check
     health := Health {} -> Null,
 
+    /// Login with Username and Password
+    ///
+    /// This method checks for login information stored in DB,
+    /// returns a token if matched and has sufficient permission.
+    ///
+    /// The token is composed with a nil user id (UUID with all 0),
+    /// which cannot be used to request some methods that require user information
+    /// like `update_setting` or `auth_user`
+    login := Login {
+        username: String,
+        password: String,
+    } -> Token {
+        token: String,
+        #[serde(with = "humantime_serde")]
+        valid_until: SystemTime
+    },
+
     // ----------- //
     // User method //
     // ----------  //
@@ -53,10 +70,7 @@ crate::methods! {
         /// that can be used to look up user
         #[serde(flatten)]
         query: UserQuery,
-    } -> Token {
-        #[serde(with = "humantime_serde")]
-        valid_until: SystemTime
-    },
+    } -> Token,
 
     /// Create a new user.
     add_user := AddUser {

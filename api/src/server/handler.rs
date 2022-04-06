@@ -3,7 +3,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
-    model::{Health, Null, UserQuery},
+    model::{Health, Login, Null, UserQuery},
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
@@ -11,7 +11,7 @@ use crate::{
         },
         ApiError, ApiResult,
     },
-    server::{Config, Context, JWTContext, Privilege, RouterExt},
+    server::{Config, Context, JWTContext, JWTGuard, Privilege, RouterExt},
 };
 
 use axum::{extract::Extension, Router};
@@ -22,6 +22,7 @@ use mongodb::{
     bson::{doc, to_bson, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
 };
+use sg_auth::{Permission, PermissionSet};
 use sg_core::models::{Entity, EventFilter, Task, User};
 use tower_http::{cors, trace};
 
@@ -39,22 +40,29 @@ pub async fn make_app(config: Config) -> Result<Router> {
     let trace_layer = trace::TraceLayer::new_for_http();
 
     let jwt = Arc::new(JWTContext::new(&config));
+    let user_guard = JWTGuard::new(jwt.clone(), Privilege::User).into_layer();
+    let bot_guard = JWTGuard::new(jwt.clone(), Privilege::Bot).into_layer();
+    let admin_guard = JWTGuard::new(jwt.clone(), Privilege::Admin).into_layer();
 
     let ctx = Context::new(jwt, config).await?;
 
     let app = Router::new()
-        .mount(health)
-        .mount(get_entities)
         .mount(add_user)
         .mount(add_entity)
         .mount(add_task)
-        .mount(auth_user)
-        .mount(del_user)
         .mount(del_entity)
         .mount(del_task)
         .mount(update_entity)
+        .layer(admin_guard)
+        .mount(get_entities)
         .mount(new_token)
+        .mount(del_user)
+        .layer(bot_guard)
         .mount(update_setting)
+        .mount(auth_user)
+        .layer(user_guard)
+        .mount(health)
+        .mount(login)
         .layer(Extension(ctx))
         .layer(cors_layer)
         .layer(trace_layer);
@@ -64,6 +72,25 @@ pub async fn make_app(config: Config) -> Result<Router> {
 
 async fn health(_: Health, _: Context) -> ApiResult<Null> {
     Ok(Null)
+}
+
+async fn login(req: Login, ctx: Context) -> ApiResult<Token> {
+    let prv = match ctx
+        .auth()
+        .look_up(req.username, req.password.as_bytes())
+        .await?
+    {
+        PermissionSet { admin: Some(p), .. } if p == Permission::ReadWrite => Privilege::Admin,
+        PermissionSet { api: Some(p), .. } if p == Permission::ReadWrite => Privilege::Bot,
+        _ => return Err(ApiError::unauthorized()),
+    };
+
+    let (token, claims) = ctx.encode(&Uuid::from_bytes([0; 16]), prv)?;
+
+    Ok(Token {
+        token,
+        valid_until: claims.valid_until(),
+    })
 }
 
 async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
@@ -173,6 +200,7 @@ async fn del_task(req: DelTask, ctx: Context) -> ApiResult<Task> {
 
 async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
     let UpdateSetting { event_filter } = req;
+    let user_id = ctx.assert_user_claims()?.id();
 
     let serialized =
         to_bson(&event_filter).map_err(|_| ApiError::bad_request("Invalid event filter"))?;
@@ -189,7 +217,7 @@ async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
         .ok_or_else(|| ApiError::user_not_found(&user_id))
 }
 
-async fn get_entities(req: GetEntities, ctx: Context) -> ApiResult<Entities> {
+async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
     let (vtbs, groups) = try_join(
         async { ctx.entities().find(None, None).await?.try_collect().await },
         async { ctx.groups().find(None, None).await?.try_collect().await },
@@ -232,8 +260,13 @@ async fn del_user(req: DelUser, ctx: Context) -> ApiResult<User> {
     ctx.del_user(&query).await
 }
 
-async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
-    let user = ctx.find_user(&UserQuery::ById { id: claims.id() }).await?;
+async fn auth_user(_: AuthUser, ctx: Context) -> ApiResult<Authorized> {
+    let claims = ctx.assert_user_claims()?;
+    let user = ctx
+        .find_user(&UserQuery::ById {
+            user_id: claims.id(),
+        })
+        .await?;
 
     Ok(Authorized {
         user,
@@ -252,15 +285,10 @@ async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
         Privilege::User
     };
 
-    let (token, claim) = match ctx.jwt.encode(&user.id, prv) {
-        Ok(token) => token,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to generate token");
-            return Err(ApiError::internal());
-        }
-    };
+    let (token, claim) = ctx.encode(&user.id, prv)?;
 
     Ok(Token {
+        token,
         valid_until: claim.valid_until(),
     })
 }

@@ -30,8 +30,8 @@ pub struct Config {
     pub entities_collection: String,
     /// MongoDB collection name for `Groups`.
     pub groups_collection: String,
-    /// MongoDB collection name for `Admins`.
-    pub bots_collection: String,
+    /// MongoDB collection name for `Auth`.
+    pub auth_collection: String,
 }
 
 impl Config {
@@ -62,7 +62,7 @@ impl Default for Config {
             tasks_collection: String::from("tasks"),
             entities_collection: String::from("entities"),
             groups_collection: String::from("groups"),
-            bots_collection: String::from("bots"),
+            auth_collection: String::from("auth"),
         }
     }
 }
@@ -95,7 +95,7 @@ mod tests {
             jail.set_env("API_TASKS_COLLECTION", "t");
             jail.set_env("API_ENTITIES_COLLECTION", "e");
             jail.set_env("API_GROUPS_COLLECTION", "g");
-            jail.set_env("API_BOTS_COLLECTION", "a");
+            jail.set_env("API_AUTH_COLLECTION", "a");
             assert_eq!(
                 Config::from_env().unwrap(),
                 Config {
@@ -108,7 +108,7 @@ mod tests {
                     tasks_collection: String::from("t"),
                     entities_collection: String::from("e"),
                     groups_collection: String::from("g"),
-                    bots_collection: String::from("a"),
+                    auth_collection: String::from("a"),
                 }
             );
             Ok(())

@@ -79,6 +79,24 @@ impl From<mongodb::error::Error> for ApiError {
     }
 }
 
+impl From<sg_auth::Error> for ApiError {
+    fn from(err: sg_auth::Error) -> Self {
+        use sg_auth::Error::{Argon, Bson, Mongo};
+
+        match err {
+            Mongo(e) => e.into(),
+            Argon(e) => {
+                tracing::error!(e = ?e, "Argon error");
+                Self::internal()
+            }
+            Bson(e) => {
+                tracing::error!(e = ?e, "Bson error");
+                Self::internal()
+            }
+        }
+    }
+}
+
 impl<R: Response> axum::response::IntoResponse for ResponseObject<R>
 where
     R: Serialize,

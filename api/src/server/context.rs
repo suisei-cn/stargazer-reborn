@@ -7,12 +7,13 @@ use mongodb::{
     options::{FindOneAndUpdateOptions, ReturnDocument},
     Client, Collection, Database,
 };
+use sg_auth::AuthClient;
 use sg_core::models::{Entity, Group, Task, User};
 
 use crate::{
     model::{Bot, UserQuery},
-    rpc::{ApiError, ApiResult, UserExt},
-    server::{config::Config, Claims, JWTContext},
+    rpc::{ApiError, ApiResult},
+    server::{config::Config, Claims, JWTContext, Privilege},
 };
 
 /// Context being shared between handlers. This will be cloned every time a handler is called.
@@ -20,16 +21,18 @@ use crate::{
 ///
 /// Since this is intended to be cloned everytime, `Option<Claims>` will be reset upon every request.
 #[must_use]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Context {
-    /// DB instance. Since DB is composed of [`Collection`](mongodb::Collection)s, cloning is cheap.
-    pub(crate) db: Database,
-    /// JWT context, used to decode, encode and validate JWT tokens.
-    pub(crate) jwt: Arc<JWTContext>,
     /// Config.
     pub(crate) config: Arc<Config>,
+    /// JWT
+    jwt: Arc<JWTContext>,
+    /// DB instance. Since DB is composed of [`Collection`](mongodb::Collection)s, cloning is cheap.
+    db: Database,
+    /// Auth context.
+    auth: AuthClient,
     /// Claims that are extracted from the JWT token header by auth middleware, optionally.
-    pub(crate) claims: Option<Claims>,
+    claims: Option<Claims>,
 }
 
 /// Context of the server. Contains the configuration and database handle.
@@ -44,13 +47,56 @@ impl Context {
         Ok(Self::new_with_db(db, jwt, config))
     }
 
+    /// Construct self with preconnected database.
     pub fn new_with_db(db: Database, jwt: Arc<JWTContext>, config: Arc<Config>) -> Self {
+        let auth = AuthClient::new(db.collection(&config.auth_collection));
         Self {
             db,
             jwt,
+            auth,
             config,
             claims: None,
         }
+    }
+
+    /// Get the claims from the JWT token header and assert its validity.
+    /// Only use this if trying to get user information from the token.
+    ///
+    /// # Errors
+    /// Fails if the token is not present, or the token is not issued for a subscriber.
+    pub fn assert_user_claims(&self) -> ApiResult<&Claims> {
+        self.claims
+            .as_ref()
+            .ok_or_else(ApiError::unauthorized)
+            .and_then(|c| {
+                if c.as_bytes() == &[0; 16] {
+                    Err(ApiError::unauthorized())
+                } else {
+                    Ok(c)
+                }
+            })
+    }
+
+    /// Get the claims from the JWT token header.
+    #[must_use]
+    pub const fn claims(&self) -> Option<&Claims> {
+        self.claims.as_ref()
+    }
+
+    /// Insert claims, if there's already one, return it
+    pub fn set_claims(&mut self, claims: Claims) -> Option<Claims> {
+        self.claims.replace(claims)
+    }
+
+    /// Encode the user id and corresponding privilege into a JWT token.
+    ///
+    /// # Errors
+    /// Fails when encoding failed. This is unlikely to happen, but if it does, it's a bug.
+    pub fn encode(&self, user_id: &Uuid, privilege: Privilege) -> ApiResult<(String, Claims)> {
+        self.jwt.encode(user_id, privilege).map_err(|e| {
+            tracing::error!(e = ?e, "Failed to encode JWT token");
+            ApiError::internal()
+        })
     }
 
     #[must_use]
@@ -74,8 +120,13 @@ impl Context {
     }
 
     #[must_use]
-    pub fn bots(&self) -> Collection<Bot> {
-        self.db.collection(&self.config.bots_collection)
+    pub fn auth_db(&self) -> Collection<Bot> {
+        self.db.collection(&self.config.auth_collection)
+    }
+
+    #[must_use]
+    pub const fn auth(&self) -> &AuthClient {
+        &self.auth
     }
 
     /// # Errors
@@ -121,35 +172,16 @@ impl Context {
     }
 
     /// # Errors
-    /// Fail on incorrect password
-    pub fn auth_password(&self, password: impl AsRef<str>) -> Result<(), ApiError> {
-        if password.as_ref() == self.config.bot_password {
-            Ok(())
-        } else {
-            Err(ApiError::wrong_password())
-        }
-    }
-
-    /// Validate a JWT token. This does not check for privilege.
-    /// To do so, use [`Claims::ensure_admin`](Claims::ensure_admin) or [`Claims::ensure_bot`](Claims::ensure_bot).
+    /// Fail on bad token, database error, the uuid is "nil" or user not exist.
     ///
-    /// # Errors
-    /// Fails on invalid or expired token.
-    pub fn validate_token(&self, token: impl AsRef<str>) -> ApiResult<Claims> {
-        self.jwt.validate(token).map_err(|_| ApiError::bad_token())
-    }
-
-    /// # Errors
-    /// Fail on bad token, database error or user not exist.
-    pub async fn find_and_assert_token(&self, token: impl AsRef<str> + Send) -> ApiResult<User> {
-        let user_id = self.validate_token(&token)?.id();
-        self.find_user(&UserQuery::ById { id: user_id }).await
-    }
-
-    /// # Errors
-    /// Fail on bad token, database error, user not exist or user is not admin.
-    pub async fn find_and_assert_admin(&self, token: impl AsRef<str> + Send) -> ApiResult<User> {
-        self.find_and_assert_token(token).await?.assert_admin()
+    /// An uuid is "nil" if all bytes are set to 0, which at here represents that
+    /// the token is issued to an admin or bot, who does not represent a subscriber.
+    pub async fn find_and_assert_claim(&self) -> ApiResult<User> {
+        let user_id = self.assert_user_claims()?.id();
+        if user_id.bytes() == [0; 16] {
+            return Err(ApiError::unauthorized());
+        }
+        self.find_user(&UserQuery::ById { user_id }).await
     }
 }
 

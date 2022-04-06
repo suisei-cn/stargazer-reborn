@@ -1,19 +1,23 @@
 #![allow(clippy::missing_errors_doc)]
+#![allow(clippy::use_self)]
 
 use std::{
     fmt::Debug,
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
+use axum::{body::BoxBody, http::Request, response::IntoResponse};
 use jsonwebtoken::{
     errors::Result as JwtResult, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
+use tower_http::auth::{AuthorizeRequest, RequireAuthorizationLayer};
 
 use crate::{
-    rpc::{ApiError, ApiResult},
-    server::Config,
+    rpc::ApiError,
+    server::{Config, Context},
 };
 
 /// Privilege of a token. Three levels: User, Bot, Admin.
@@ -60,25 +64,14 @@ impl Claims {
         Uuid::from_bytes(self.aud)
     }
 
-    /// Validate the user has admin privilege.
-    pub fn ensure_admin(&self) -> ApiResult<()> {
-        if self.prv == Privilege::Admin {
-            Ok(())
-        } else {
-            Err(ApiError::unauthorized())
-        }
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.aud
     }
 
-    /// Validate the user has bot privilege, which can be two cases:
-    ///
-    /// - The user is a bot
-    /// - The user is an admin
-    pub fn ensure_bot(&self) -> ApiResult<()> {
-        if self.prv >= Privilege::Bot {
-            Ok(())
-        } else {
-            Err(ApiError::unauthorized())
-        }
+    #[must_use]
+    pub const fn into_bytes(self) -> [u8; 16] {
+        self.aud
     }
 }
 
@@ -93,6 +86,7 @@ pub struct JWTContext {
 }
 
 impl JWTContext {
+    // TODO: use pem instead of secret key to sign the token
     pub fn new(config: &Config) -> Self {
         let bytes = config.bot_password.as_bytes();
         let encode_key = EncodingKey::from_secret(bytes);
@@ -125,18 +119,6 @@ impl JWTContext {
         Ok((token, claim))
     }
 
-    /// Generate a token that is literally never gonna expire. Exp is set to [`usize::MAX`].
-    /// The safety is garanted by the handler, which should validate the bot id is still in database.
-    pub fn encode_bot_token(&self, user_id: &Uuid) -> JwtResult<(String, Claims)> {
-        let claim = Claims {
-            aud: user_id.bytes(),
-            exp: usize::MAX,
-            prv: Privilege::Bot,
-        };
-        let token = jsonwebtoken::encode(&self.header, &claim, &self.encode_key)?;
-        Ok((token, claim))
-    }
-
     /// Decode the token and validate the token is not expired, which is done automatically by [`jsonwebtoken`].
     pub fn decode(&self, token: impl AsRef<str>) -> JwtResult<TokenData<Claims>> {
         jsonwebtoken::decode::<Claims>(token.as_ref(), &self.decode_key, &self.val)
@@ -157,6 +139,72 @@ impl Debug for JWTContext {
             .field("header", &self.header)
             .field("val", &self.val)
             .finish()
+    }
+}
+
+/// A guard that can be used with [`tower_http::auth::RequireAuthorizationLayer`]
+/// to garante the user is authorized and authenticated.
+/// ( Privilege must be greater than `guard` )
+#[derive(Clone)]
+pub struct JWTGuard {
+    pub(crate) jwt: Arc<JWTContext>,
+    guard: Privilege,
+}
+
+impl JWTGuard {
+    #[must_use]
+    pub fn new(jwt: Arc<JWTContext>, guard: Privilege) -> Self {
+        Self { jwt, guard }
+    }
+
+    #[must_use]
+    pub fn into_layer(self) -> RequireAuthorizationLayer<Self> {
+        RequireAuthorizationLayer::custom(self)
+    }
+}
+
+impl<B> AuthorizeRequest<B> for JWTGuard
+where
+    B: Send + Sync + 'static,
+{
+    type ResponseBody = BoxBody;
+
+    fn authorize(
+        &mut self,
+        request: &mut Request<B>,
+    ) -> std::result::Result<(), http::Response<Self::ResponseBody>> {
+        let token = request
+            .headers()
+            .get(http::header::AUTHORIZATION)
+            .ok_or_else(|| ApiError::unauthorized().into_response())?
+            .to_str()
+            .map_err(|_| {
+                ApiError::bad_request("Invalid header authentication encoding").into_response()
+            })?
+            .strip_prefix("Bearer ")
+            .ok_or_else(|| {
+                ApiError::bad_request(
+                    "Invalid authentication header, this should be in bearer token format",
+                )
+                .into_response()
+            })?;
+
+        let claims = self
+            .jwt
+            .validate(token)
+            .map_err(|_| ApiError::bad_token().into_response())?;
+
+        if self.guard > claims.prv {
+            return Err(ApiError::unauthorized().into_response());
+        }
+
+        let _ = request
+            .extensions_mut()
+            .get_mut::<Context>()
+            .expect("Context not set")
+            .set_claims(claims);
+
+        Ok(())
     }
 }
 
