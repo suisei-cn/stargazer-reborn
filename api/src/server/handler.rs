@@ -3,7 +3,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
-    model::{AdjustUserPrivilege, BotInfo, Bots, GetBots, Health, NewBot, Null, UserQuery},
+    model::{Health, Null, UserQuery},
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
@@ -53,11 +53,8 @@ pub async fn make_app(config: Config) -> Result<Router> {
         .mount(del_entity)
         .mount(del_task)
         .mount(update_entity)
-        .mount(new_bot)
         .mount(new_token)
-        .mount(get_bots)
         .mount(update_setting)
-        .mount(adjust_user_privilege)
         .layer(Extension(ctx))
         .layer(cors_layer)
         .layer(trace_layer);
@@ -69,29 +66,8 @@ async fn health(_: Health, _: Context) -> ApiResult<Null> {
     Ok(Null)
 }
 
-async fn get_bots(_req: GetBots, _ctx: Context) -> ApiResult<Bots> {
-    todo!()
-}
-
-async fn new_bot(_req: NewBot, _ctx: Context) -> ApiResult<BotInfo> {
-    todo!()
-}
-async fn adjust_user_privilege(req: AdjustUserPrivilege, ctx: Context) -> ApiResult<User> {
-    ctx.validate_token(&req.token)?.ensure_admin()?;
-
-    ctx.update_user(
-        &req.query,
-        doc! {
-            "is_admin": req.is_admin,
-        },
-    )
-    .await
-}
-
 async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
-    let AddEntity { meta, tasks, token } = req;
-
-    ctx.validate_token(token)?.ensure_admin()?;
+    let AddEntity { meta, tasks } = req;
 
     tracing::info!(meta = ?meta);
 
@@ -116,13 +92,7 @@ async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
 }
 
 async fn update_entity(req: UpdateEntity, ctx: Context) -> ApiResult<Entity> {
-    let UpdateEntity {
-        entity_id,
-        meta,
-        token,
-    } = req;
-
-    ctx.validate_token(token)?.ensure_admin()?;
+    let UpdateEntity { entity_id, meta } = req;
 
     let ser = to_bson(&meta).map_err(|_| ApiError::bad_request("Invalid meta"))?;
 
@@ -139,9 +109,7 @@ async fn update_entity(req: UpdateEntity, ctx: Context) -> ApiResult<Entity> {
 }
 
 async fn del_entity(req: DelEntity, ctx: Context) -> ApiResult<Entity> {
-    let DelEntity { entity_id, token } = req;
-
-    ctx.validate_token(token)?.ensure_admin()?;
+    let DelEntity { entity_id } = req;
 
     // Get the entity, make sure it exists and get all related tasks
     let entity = ctx
@@ -159,8 +127,6 @@ async fn del_entity(req: DelEntity, ctx: Context) -> ApiResult<Entity> {
 }
 
 async fn add_task(req: AddTask, ctx: Context) -> ApiResult<Task> {
-    ctx.validate_token(&req.token)?.ensure_admin()?;
-
     let id = req.entity_id;
     let task: Task = req.into();
 
@@ -184,9 +150,7 @@ async fn add_task(req: AddTask, ctx: Context) -> ApiResult<Task> {
 }
 
 async fn del_task(req: DelTask, ctx: Context) -> ApiResult<Task> {
-    let DelTask { task_id, token } = req;
-
-    ctx.validate_token(token)?.ensure_admin()?;
+    let DelTask { task_id } = req;
 
     // Make sure this exists
     let task = ctx
@@ -208,12 +172,7 @@ async fn del_task(req: DelTask, ctx: Context) -> ApiResult<Task> {
 }
 
 async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
-    let UpdateSetting {
-        token,
-        event_filter,
-    } = req;
-
-    let user_id = ctx.validate_token(&token)?.id();
+    let UpdateSetting { event_filter } = req;
 
     let serialized =
         to_bson(&event_filter).map_err(|_| ApiError::bad_request("Invalid event filter"))?;
@@ -231,7 +190,6 @@ async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
 }
 
 async fn get_entities(req: GetEntities, ctx: Context) -> ApiResult<Entities> {
-    let _ = ctx.validate_token(req.token)?;
     let (vtbs, groups) = try_join(
         async { ctx.entities().find(None, None).await?.try_collect().await },
         async { ctx.groups().find(None, None).await?.try_collect().await },
@@ -246,11 +204,9 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
         im,
         im_payload,
         avatar,
-        token,
+
         name,
     } = req;
-
-    ctx.validate_token(token)?.ensure_bot()?;
 
     let user = User {
         im,
@@ -271,14 +227,12 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
 }
 
 async fn del_user(req: DelUser, ctx: Context) -> ApiResult<User> {
-    let DelUser { token, query } = req;
+    let DelUser { query } = req;
 
-    ctx.validate_token(token)?.ensure_bot()?;
     ctx.del_user(&query).await
 }
 
 async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
-    let claims = ctx.validate_token(&req.token)?;
     let user = ctx.find_user(&UserQuery::ById { id: claims.id() }).await?;
 
     Ok(Authorized {
@@ -288,9 +242,7 @@ async fn auth_user(req: AuthUser, ctx: Context) -> ApiResult<Authorized> {
 }
 
 async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
-    let NewToken { query, token } = &req;
-
-    ctx.validate_token(token)?.ensure_bot()?;
+    let NewToken { query } = &req;
 
     let user = ctx.find_user(query).await?;
 
@@ -309,7 +261,6 @@ async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
     };
 
     Ok(Token {
-        token,
         valid_until: claim.valid_until(),
     })
 }

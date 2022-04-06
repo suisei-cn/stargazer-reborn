@@ -17,6 +17,8 @@ use crate::{
 
 /// Context being shared between handlers. This will be cloned every time a handler is called.
 /// So all underlineing data should be wrapped in Arc or similar shared reference thingy.
+///
+/// Since this is intended to be cloned everytime, `Option<Claims>` will be reset upon every request.
 #[must_use]
 #[derive(Debug, Clone)]
 pub struct Context {
@@ -26,6 +28,8 @@ pub struct Context {
     pub(crate) jwt: Arc<JWTContext>,
     /// Config.
     pub(crate) config: Arc<Config>,
+    /// Claims that are extracted from the JWT token header by auth middleware, optionally.
+    pub(crate) claims: Option<Claims>,
 }
 
 /// Context of the server. Contains the configuration and database handle.
@@ -41,7 +45,12 @@ impl Context {
     }
 
     pub fn new_with_db(db: Database, jwt: Arc<JWTContext>, config: Arc<Config>) -> Self {
-        Self { db, jwt, config }
+        Self {
+            db,
+            jwt,
+            config,
+            claims: None,
+        }
     }
 
     #[must_use]
