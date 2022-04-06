@@ -36,7 +36,7 @@ pub struct Claims {
     /// Bytes representation of user id which can be decode and encoded into [`Uuid`].
     aud: [u8; 16],
     /// Expiration time represented in Unix timestamp.
-    exp: usize,
+    exp: u64,
     /// Privilege of this token
     prv: Privilege,
 }
@@ -50,7 +50,7 @@ impl Claims {
 
     /// Expiration time of the token in Unix timestamp.
     #[must_use]
-    pub const fn valid_until_timestamp(&self) -> usize {
+    pub const fn valid_until_timestamp(&self) -> u64 {
         self.exp
     }
 
@@ -107,20 +107,18 @@ impl JWTContext {
         }
     }
 
-    fn get_exp(&self) -> usize {
+    fn calculate_exp(&self) -> u64 {
         (SystemTime::now() + self.timeout)
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs()
-            .try_into()
-            .expect("Time went too far, or you're running on a 16-bit system?")
     }
 
     /// Encode the user id and corresponding privilege into a JWT token.
     pub fn encode(&self, user_id: &Uuid, privilege: Privilege) -> JwtResult<(String, Claims)> {
         let claim = Claims {
             aud: user_id.bytes(),
-            exp: self.get_exp(),
+            exp: self.calculate_exp(),
             prv: privilege,
         };
         let token = jsonwebtoken::encode(&self.header, &claim, &self.encode_key)?;
