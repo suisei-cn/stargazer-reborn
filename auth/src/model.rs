@@ -1,3 +1,5 @@
+#![allow(clippy::use_self)]
+
 use argon2::password_hash::{Encoding, PasswordHash};
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +69,7 @@ pub struct PermissionRecord {
 
 impl PermissionRecord {
     pub fn new(
-        hash: PasswordHash,
+        hash: &PasswordHash,
         username: impl Into<String>,
         permissions: PermissionSet,
     ) -> Self {
@@ -79,17 +81,19 @@ impl PermissionRecord {
     }
 
     /// Get hash string
+    #[must_use]
     pub fn hash(&self) -> &str {
         &self.hash
     }
 
     /// Get the username
+    #[must_use]
     pub fn username(&self) -> &str {
         &self.username
     }
 
     /// Get the permissions
-    pub fn permissions(&self) -> PermissionSet {
+    pub const fn permissions(&self) -> PermissionSet {
         self.permissions
     }
 
@@ -98,6 +102,9 @@ impl PermissionRecord {
     ///
     /// [`Output::init_with`]: argon2::password_hash::Output::init_with
     /// [`decode_with`]: Self::decode_with
+    ///
+    /// # Errors
+    /// Return an error if the hash cannot be decoded with the default encoding, which is base64.
     pub fn decode(&self) -> Result<PasswordHash> {
         self.decode_with(Encoding::default())
     }
@@ -108,6 +115,9 @@ impl PermissionRecord {
     /// should all be using the default encoding, which is base64.
     ///
     /// [`AuthClient::new_record`]: crate::AuthClient::new_record
+    ///
+    /// # Errors
+    /// Return an error if the hash cannot be decoded with given encoding.
     pub fn decode_with(&self, encoding: Encoding) -> Result<PasswordHash> {
         PasswordHash::parse(&self.hash, encoding).map_err(Into::into)
     }

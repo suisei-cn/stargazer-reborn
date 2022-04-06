@@ -1,3 +1,5 @@
+#![allow(clippy::wildcard_imports, clippy::default_trait_access)]
+
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
@@ -10,7 +12,7 @@ use mongodb::{
 
 mod_use::mod_use![model, error];
 
-/// Provides marjor functions that one will need.
+/// Provides major functions that one will need.
 ///
 /// This is the primary type for using the `auth` module.
 /// It will interact with the database, generate and validate records.
@@ -22,19 +24,24 @@ pub struct AuthClient {
 
 impl AuthClient {
     /// Create a new [`AuthClient`] with the given [`Collection`].
-    pub fn new(collection: Collection<PermissionRecord>) -> AuthClient {
-        AuthClient {
+    #[must_use]
+    pub fn new(collection: Collection<PermissionRecord>) -> Self {
+        Self {
             collection,
             argon: Default::default(),
         }
     }
 
     /// Get the inner [`Collection`].
+    #[must_use]
     pub fn collection(&self) -> Collection<PermissionRecord> {
         self.collection.clone()
     }
 
     /// List all records in the database.
+    ///
+    /// # Errors
+    /// Return an error if unable to query the database.
     pub async fn list(&self) -> Result<Cursor<PermissionRecord>> {
         self.collection.find(None, None).await.map_err(Into::into)
     }
@@ -51,6 +58,9 @@ impl AuthClient {
     /// [`estimated_document_count`]: Collection::estimated_document_count
     /// [`count`]: https://www.mongodb.com/docs/manual/reference/method/db.collection.count/
     /// [`countDocuments`]: https://www.mongodb.com/docs/manual/reference/method/db.collection.countDocuments/
+    ///
+    /// # Errors
+    /// Return an error if unable to query the database.
     pub async fn count(&self) -> Result<u64> {
         if cfg!(debug_assertions) {
             self.collection.count_documents(None, None).await
@@ -62,19 +72,22 @@ impl AuthClient {
 
     /// Try insert a new record.
     ///
-    /// Return wether the record is inserted.
+    /// Return whether the record is inserted.
     /// If one record with same username exists, this will leave it intact.
+    ///
+    /// # Errors
+    /// Return an error if unable to insert the record, or failed to compute the hash.
     pub async fn new_record(
         &self,
-        username: impl Into<String>,
-        password: impl AsRef<[u8]>,
+        username: impl Into<String> + Send,
+        password: impl AsRef<[u8]> + Send,
         permission: PermissionSet,
     ) -> Result<bool> {
         let username = username.into();
         let salt = SaltString::generate(&mut OsRng);
         let hash = self.argon.hash_password(password.as_ref(), &salt)?;
 
-        let record = PermissionRecord::new(hash, username, permission);
+        let record = PermissionRecord::new(&hash, username, permission);
 
         let doc = to_bson(&record)?;
         let res = self
@@ -93,14 +106,17 @@ impl AuthClient {
         Ok(res.upserted_id.is_some())
     }
 
-    /// Try insert a new record.
+    /// Try update the permission set of a record.
     ///
-    /// Return wether the record is inserted.
-    /// If one record with same username exists, this will leave it intact.
+    /// Return the new permission set.
+    /// If username or password is invalid, this will return `None` and no update will be done.
+    ///
+    /// # Errors
+    /// Return an error if unable to insert the record, or failed to compute the hash.
     pub async fn update_record(
         &self,
-        username: impl AsRef<str>,
-        password: impl AsRef<[u8]>,
+        username: impl AsRef<str> + Send,
+        password: impl AsRef<[u8]> + Send,
         permission: PermissionSet,
     ) -> Result<Option<PermissionSet>> {
         let username = username.as_ref();
@@ -134,13 +150,19 @@ impl AuthClient {
     /// Look up permission of a user by username and password.
     ///
     /// When the username and password combination are invalid, this will return [`PermissionSet::EMPTY`].
+    ///
+    /// # Errors
+    /// Return an error if unable to insert the record, or failed to compute the hash.
     pub async fn look_up(
         &self,
-        username: impl AsRef<str>,
-        password: impl AsRef<[u8]>,
+        username: impl AsRef<str> + Send,
+        password: impl AsRef<[u8]> + Send,
     ) -> Result<PermissionSet> {
+        let username = username.as_ref();
+        let password = password.as_ref();
+
         Ok(self
-            .look_up_impl(username.as_ref(), password.as_ref())
+            .look_up_impl(username, password)
             .await?
             .unwrap_or_default())
     }
@@ -162,6 +184,9 @@ impl AuthClient {
     }
 
     /// Validate if a password is correct
+    ///
+    /// # Errors
+    /// Return an error if failed to compute the hash.
     pub fn validate(&self, hash: &PasswordHash, password: impl AsRef<[u8]>) -> Result<()> {
         self.argon
             .verify_password(password.as_ref(), hash)
@@ -171,6 +196,8 @@ impl AuthClient {
 
 #[cfg(test)]
 mod test {
+    use futures::StreamExt;
+
     use crate::*;
 
     #[tokio::test]
@@ -240,6 +267,4 @@ mod test {
         // Clean up
         client.collection().drop(None).await.unwrap();
     }
-
-    use futures::StreamExt;
 }
