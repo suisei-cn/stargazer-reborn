@@ -67,12 +67,12 @@ impl AuthClient {
     pub async fn new_record(
         &self,
         username: impl Into<String>,
-        password: &[u8],
+        password: impl AsRef<[u8]>,
         permission: PermissionSet,
     ) -> Result<bool> {
         let username = username.into();
         let salt = SaltString::generate(&mut OsRng);
-        let hash = self.argon.hash_password(password, &salt)?;
+        let hash = self.argon.hash_password(password.as_ref(), &salt)?;
 
         let record = PermissionRecord::new(hash, username, permission);
 
@@ -99,23 +99,25 @@ impl AuthClient {
     pub async fn look_up(
         &self,
         username: impl AsRef<str>,
-        password: &[u8],
+        password: impl AsRef<[u8]>,
     ) -> Result<PermissionSet> {
         let res = self
             .collection
             .find_one(doc! { "username": username.as_ref() }, None)
             .await?;
         let res = match res {
-            Some(rec) if self.validate(&rec.decode()?, password).is_ok() => rec.permissions(),
+            Some(rec) if self.validate(&rec.decode()?, password.as_ref()).is_ok() => {
+                rec.permissions()
+            }
             _ => PermissionSet::EMPTY,
         };
         Ok(res)
     }
 
     /// Validate if a password is correct
-    pub fn validate(&self, hash: &PasswordHash, password: &[u8]) -> Result<()> {
+    pub fn validate(&self, hash: &PasswordHash, password: impl AsRef<[u8]>) -> Result<()> {
         self.argon
-            .verify_password(password, hash)
+            .verify_password(password.as_ref(), hash)
             .map_err(Into::into)
     }
 }
@@ -143,7 +145,7 @@ mod test {
         let password = b"test_password";
         let per = PermissionSet {
             api: Some(Permission::ReadOnly),
-            method: Some(Permission::ReadWrite),
+            mq: Some(Permission::ReadWrite),
             coordinator: None,
         };
 

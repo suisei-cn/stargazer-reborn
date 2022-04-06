@@ -21,7 +21,7 @@ pub struct PermissionSet {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api: Option<Permission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub method: Option<Permission>,
+    pub mq: Option<Permission>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coordinator: Option<Permission>,
 }
@@ -36,7 +36,7 @@ impl PermissionSet {
     pub(crate) const fn empty() -> Self {
         Self {
             api: None,
-            method: None,
+            mq: None,
             coordinator: None,
         }
     }
@@ -44,7 +44,7 @@ impl PermissionSet {
     pub(crate) const fn full() -> Self {
         Self {
             api: Some(Permission::ReadWrite),
-            method: Some(Permission::ReadWrite),
+            mq: Some(Permission::ReadWrite),
             coordinator: Some(Permission::ReadWrite),
         }
     }
