@@ -37,7 +37,7 @@ pub trait MessageQueue: Send + Sync {
     async fn consume(
         &self,
         middleware: Option<&str>,
-    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>>>>;
+    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>> + Send>>;
 }
 
 #[async_trait]
@@ -49,7 +49,7 @@ impl<T: Deref<Target = dyn MessageQueue> + Send + Sync> MessageQueue for T {
     async fn consume(
         &self,
         middleware: Option<&str>,
-    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>>>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>> + Send>> {
         self.deref().consume(middleware).await
     }
 }
@@ -150,7 +150,7 @@ impl MessageQueue for RabbitMQ {
     async fn consume(
         &self,
         middleware: Option<&str>,
-    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>>>> {
+    ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>> + Send>> {
         let consumer = self.consume_connect(middleware).await;
         info!(middleware = ?middleware, "Listening for events.");
         match consumer {
@@ -246,7 +246,7 @@ pub mod tests {
         async fn consume(
             &self,
             middleware: Option<&str>,
-        ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>>>> {
+        ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>> + Send>> {
             let interested = middleware.map(std::string::ToString::to_string);
             Box::pin(
                 BroadcastStream::new(self.tx.subscribe())
