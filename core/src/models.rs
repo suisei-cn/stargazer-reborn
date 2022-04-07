@@ -75,21 +75,37 @@ pub struct Event {
 }
 
 impl Event {
-    /// Create a new event with its fields set by a serializable object.
+    /// Create a new event with a given id with its fields set by a serializable object.
     ///
     /// # Errors
     /// Returns an error if the fields cannot be serialized into a map.
-    pub fn from_serializable(kind: &str, entity: Uuid, fields: impl Serialize) -> Result<Self> {
+    pub fn from_serializable_with_id(
+        id: impl Into<Uuid>,
+        kind: &str,
+        entity: impl Into<Uuid>,
+        fields: impl Serialize,
+    ) -> Result<Self> {
         Ok(Self {
-            id: Uuid::new(),
+            id: id.into(),
             kind: kind.to_string(),
-            entity,
+            entity: entity.into(),
             fields: serde_json::to_value(fields)
                 .wrap_err("event fields can't be converted into json value")?
                 .as_object()
                 .ok_or_else(|| eyre!("event field is not a map"))?
                 .clone(),
         })
+    }
+    /// Create a new event with its fields set by a serializable object.
+    ///
+    /// # Errors
+    /// Returns an error if the fields cannot be serialized into a map.
+    pub fn from_serializable(
+        kind: &str,
+        entity: impl Into<Uuid>,
+        fields: impl Serialize,
+    ) -> Result<Self> {
+        Self::from_serializable_with_id(Uuid::new(), kind, entity, fields)
     }
 }
 
