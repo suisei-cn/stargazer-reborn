@@ -30,7 +30,7 @@ use crate::Config;
 #[derive(Clone)]
 pub struct TwitterWorker {
     token: Arc<Token>,
-    mq: Arc<MessageQueue>,
+    mq: Arc<dyn MessageQueue>,
     interval: Duration,
 
     #[allow(clippy::type_complexity)]
@@ -40,7 +40,7 @@ pub struct TwitterWorker {
 impl TwitterWorker {
     /// Creates a new worker.
     #[must_use]
-    pub fn new(config: Config, mq: MessageQueue) -> Self {
+    pub fn new(config: Config, mq: impl MessageQueue + 'static) -> Self {
         Self {
             token: Arc::new(Token::Bearer(config.twitter_token)),
             mq: Arc::new(mq),
@@ -132,7 +132,7 @@ async fn twitter_task(
     user_id: UserID,
     token: &Token,
     entity_id: Uuid,
-    mq: &MessageQueue,
+    mq: impl MessageQueue,
     poll_interval: Duration,
 ) -> Result<()> {
     let mut ticker = interval(poll_interval);

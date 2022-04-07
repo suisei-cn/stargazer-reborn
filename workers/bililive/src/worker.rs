@@ -22,7 +22,7 @@ use crate::bililive::LiveRoom;
 
 #[derive(Clone)]
 pub struct BililiveWorker {
-    mq: Arc<MessageQueue>,
+    mq: Arc<dyn MessageQueue>,
 
     #[allow(clippy::type_complexity)]
     tasks: Arc<Mutex<HashMap<Uuid, (Task, ScopedJoinHandle<()>)>>>,
@@ -31,7 +31,7 @@ pub struct BililiveWorker {
 impl BililiveWorker {
     /// Creates a new worker.
     #[must_use]
-    pub fn new(mq: MessageQueue) -> Self {
+    pub fn new(mq: impl MessageQueue + 'static) -> Self {
         Self {
             mq: Arc::new(mq),
             tasks: Arc::new(Mutex::new(HashMap::new())),
@@ -108,7 +108,7 @@ struct Command {
     cmd: String,
 }
 
-async fn bililive_task(uid: u64, entity_id: Uuid, mq: &MessageQueue) -> Result<()> {
+async fn bililive_task(uid: u64, entity_id: Uuid, mq: impl MessageQueue) -> Result<()> {
     let config = bililive::ConfigBuilder::new()
         .fetch_conf()
         .await
