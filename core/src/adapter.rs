@@ -79,14 +79,14 @@ mod tests {
 
     use crate::adapter::WsTransport;
 
-    const fn assert_transport<T>()
+    fn assert_transport<T>()
     where
         T: Transport<ClientMessage<()>, Response<()>>,
     {
     }
 
     #[test]
-    const fn must_adapter_transport() {
+    fn must_adapter_transport() {
         assert_transport::<WsTransport<WebSocketStream<TcpStream>, _>>();
     }
 }
