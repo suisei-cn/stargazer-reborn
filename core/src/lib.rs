@@ -9,3 +9,5 @@ pub mod models;
 pub mod mq;
 pub mod protocol;
 pub mod utils;
+
+pub use async_trait;
