@@ -1,12 +1,10 @@
 use std::process::Command;
-use std::str::FromStr;
 use std::time::Duration;
 
 use assert_cmd::cargo::CommandCargoExt;
 use futures_util::StreamExt;
 use serde_json::json;
 use tokio::time::{sleep, timeout};
-use tracing::level_filters::LevelFilter;
 use uuid::Uuid;
 
 use sg_core::models::Event;
@@ -14,10 +12,6 @@ use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
 #[tokio::test]
 async fn must_translate_and_put_back() {
-    tracing_subscriber::fmt()
-        .with_max_level(LevelFilter::DEBUG)
-        .init();
-
     let original = Event {
         id: Uuid::nil().into(),
         kind: "".to_string(),
@@ -50,8 +44,8 @@ async fn must_translate_and_put_back() {
         .clone(),
     };
 
-    let mut cmd = Command::cargo_bin("translate").unwrap();
-    let mut program = cmd
+    let mut program = Command::cargo_bin("translate")
+        .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
         .env("MIDDLEWARE_AMQP_EXCHANGE", "test")
         .env("MIDDLEWARE_DEBUG", "true")
@@ -65,12 +59,9 @@ async fn must_translate_and_put_back() {
 
     sleep(Duration::from_secs(1)).await;
 
-    mq.publish(
-        original,
-        Middlewares::from_str("translate_debug.translate").unwrap(),
-    )
-    .await
-    .unwrap();
+    mq.publish(original, "translate_debug.translate".parse().unwrap())
+        .await
+        .unwrap();
 
     let msg = consumer.next().await.unwrap().unwrap();
     assert_eq!(msg, (Middlewares::default(), translated));

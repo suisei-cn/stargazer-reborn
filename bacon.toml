@@ -18,6 +18,7 @@ ctrl-d = "scroll-page(1)"
 
 [jobs.clippy]
 command = ["cargo", "clippy", "--workspace", "--tests", "--color", "always", "--", "-W", "clippy::all", "-W", "clippy::nursery", "-W", "clippy::pedantic"]
+watch = ["src", "tests"]
 need_stdout = false
 
 [jobs.test]
