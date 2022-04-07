@@ -15,6 +15,8 @@ pub struct Config {
     pub id: Uuid,
     /// AMQP connection url.
     pub amqp_url: String,
+    /// AMQP exchange name.
+    pub amqp_exchange: String,
     /// The coordinator url to connect to.
     pub coordinator_url: String,
     /// Twitter API token.
@@ -41,6 +43,7 @@ impl Default for Config {
         Self {
             id: Uuid::nil(),
             amqp_url: String::from("amqp://guest:guest@localhost:5672"),
+            amqp_exchange: String::from("stargazer-reborn"),
             coordinator_url: String::from("ws://127.0.0.1:7000"),
             twitter_token: String::new(),
             poll_interval: Duration::from_secs(60),
@@ -71,6 +74,7 @@ mod tests {
             let id = Uuid::from_u128(1);
             jail.set_env("WORKER_ID", &id);
             jail.set_env("WORKER_AMQP_URL", "amqp://admin:admin@localhost:5672");
+            jail.set_env("WORKER_AMQP_EXCHANGE", "some_exchange");
             jail.set_env("WORKER_COORDINATOR_URL", "ws://localhost:8080");
             jail.set_env("WORKER_TWITTER_TOKEN", "blabla");
             jail.set_env("WORKER_POLL_INTERVAL", "30s");
@@ -79,6 +83,7 @@ mod tests {
                 Config {
                     id,
                     amqp_url: String::from("amqp://admin:admin@localhost:5672"),
+                    amqp_exchange: String::from("some_exchange"),
                     coordinator_url: String::from("ws://localhost:8080"),
                     twitter_token: String::from("blabla"),
                     poll_interval: Duration::from_secs(30),

@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
 
     let config = Config::from_env().wrap_err("Failed to load config from environment variables")?;
 
-    let mq = RabbitMQ::new(&*config.amqp_url)
+    let mq = RabbitMQ::new(&config.amqp_url, &config.amqp_exchange)
         .await
         .wrap_err("Failed to connect to AMQP")?;
 
