@@ -173,6 +173,7 @@ where
         &mut self,
         request: &mut Request<B>,
     ) -> std::result::Result<(), http::Response<Self::ResponseBody>> {
+        tracing::debug!(method = ?request.uri().path(), "Authorizing request");
         let token = request
             .headers()
             .get(http::header::AUTHORIZATION)
@@ -193,6 +194,8 @@ where
             .jwt
             .validate(token)
             .map_err(|_| ApiError::bad_token().into_response())?;
+
+        tracing::debug!(privilege = ?claims.prv, guard = ?self.guard);
 
         if self.guard > claims.prv {
             return Err(ApiError::unauthorized().into_response());

@@ -55,8 +55,8 @@ impl Client {
         Ok(resp)
     }
 
-    pub fn set_token(&mut self, token: impl Into<String>) {
-        self.token = Some(token.into());
+    pub fn set_token(&mut self, token: impl Into<String>) -> Option<String> {
+        self.token.replace(token.into())
     }
 
     #[must_use]

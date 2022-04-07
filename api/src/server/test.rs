@@ -1,168 +1,165 @@
-// use std::collections::{HashMap, HashSet};
+mod prep {
+    use std::{
+        env,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Once,
+        },
+        thread::available_parallelism,
+        time::Duration,
+    };
 
-// use crate::rpc::{
-//     model::{
-//         AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewToken, Token,
-//         UpdateSetting,
-//     },
-//     ApiError, ApiResult, Request, ResponseObject,
-// };
+    use once_cell::sync::Lazy;
+    use sg_auth::{AuthClient, PermissionRecord, PermissionSet};
+    use tracing::metadata::LevelFilter;
 
-// use color_eyre::{eyre::Context, Result};
-// use isolanguage_1::LanguageCode;
-// use mongodb::bson::{doc, Uuid};
-// use serde::{de::DeserializeOwned, Deserialize, Serialize};
-// use sg_core::models::{Entity, EventFilter, Meta, Name, User};
+    use crate::{
+        client::blocking::Client,
+        server::{serve_with_config, Config},
+    };
 
-// mod prep {
-//     use std::{env, sync::Once, thread::available_parallelism, time::Duration};
+    static INIT: Once = Once::new();
+    static WAITED: AtomicBool = AtomicBool::new(false);
 
-//     use tracing::metadata::LevelFilter;
+    pub fn prep() -> Client {
+        INIT.call_once(|| {
+            tracing_subscriber::fmt()
+                .with_max_level(LevelFilter::INFO)
+                .init();
 
-//     use crate::server::{serve_with_config, Config};
+            tracing::info!("Initializing test suite");
 
-//     static INIT: Once = Once::new();
+            color_eyre::install().unwrap();
 
-//     pub fn prep() {
-//         INIT.call_once(|| {
-//             tracing_subscriber::fmt()
-//                 .with_max_level(LevelFilter::INFO)
-//                 .init();
+            // Spawn a server into background, which ideally will be destroyed when all tests are finished.
+            std::thread::spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(available_parallelism().unwrap().into())
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        let mongo_uri = std::env::var("MONGODB_URI")
+                            .unwrap_or_else(|_| "mongodb://localhost:27017".to_owned());
 
-//             tracing::info!("Initializing test suite");
+                        let col = mongodb::Client::with_uri_str(&mongo_uri)
+                            .await
+                            .unwrap()
+                            .database("stargazer-reborn")
+                            .collection::<PermissionRecord>("auth");
 
-//             color_eyre::install().unwrap();
+                        AuthClient::new(col)
+                            .new_record("test", "test", PermissionSet::FULL)
+                            .await
+                            .unwrap();
 
-//             // Spawn a server into background, which ideally will be destroyed when all tests are finished.
-//             std::thread::spawn(|| {
-//                 tokio::runtime::Builder::new_multi_thread()
-//                     .worker_threads(available_parallelism().unwrap().into())
-//                     .enable_all()
-//                     .build()
-//                     .unwrap()
-//                     .block_on(serve_with_config(Config {
-//                         bind: "127.0.0.1:8080".parse().unwrap(),
-//                         token_timeout: Duration::from_secs(0),
-//                         mongo_uri: env::var("MONGODB_URL").expect("MONGODB_URL is not se"),
-//                         ..Default::default()
-//                     }))
-//             });
-//         });
-//     }
-// }
+                        serve_with_config(Config {
+                            bind: "127.0.0.1:8080".parse().unwrap(),
+                            token_timeout: Duration::from_secs(0),
+                            mongo_uri,
+                            ..Default::default()
+                        })
+                        .await
+                        .unwrap();
+                    });
+            });
+        });
 
-// use prep::prep;
+        if !WAITED.load(Ordering::Acquire) {
+            WAITED.store(true, Ordering::Release);
+            std::thread::sleep(Duration::from_secs(2));
+        }
 
-// fn new_session(user_id: Uuid) -> Result<ApiResult<Token>> {
-//     call(NewToken {
-//         password: "TEST".to_owned(),
-//         user_id,
-//     })
-// }
+        let mut c = Client::new("http://127.0.0.1:8080/v1/").unwrap();
+        c.login_and_store("test", "test").unwrap().unwrap();
+        c
+    }
+}
 
-// fn call<R: Request + Serialize>(body: R) -> Result<ApiResult<R::Res>>
-// where
-//     R::Res: DeserializeOwned,
-// {
-//     #[derive(Serialize, Deserialize)]
-//     #[serde(untagged)]
-//     enum Shim<R> {
-//         Ok(R),
-//         Err(ApiError),
-//     }
+use std::collections::{HashMap, HashSet};
 
-//     impl<T> From<Shim<T>> for ApiResult<T> {
-//         fn from(shim: Shim<T>) -> Self {
-//             match shim {
-//                 Shim::Ok(res) => ApiResult::Ok(res),
-//                 Shim::Err(err) => ApiResult::Err(err),
-//             }
-//         }
-//     }
+use crate::{
+    model::UserQuery,
+    rpc::{
+        model::{
+            AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewToken,
+            Token, UpdateSetting,
+        },
+        ApiError, ApiResult, Request, ResponseObject,
+    },
+};
 
-//     let res = reqwest::blocking::Client::builder()
-//         .build()?
-//         .post("http://127.0.0.1:8080/v1")
-//         .body(body.packed().to_json())
-//         .header("Content-Type", "application/json")
-//         .send()
-//         .wrap_err("Failed to send request")?
-//         .text()
-//         .wrap_err("Failed to read response")?;
+use color_eyre::{eyre::Context, Result};
+use isolanguage_1::LanguageCode;
+use mongodb::bson::{doc, Uuid};
+use prep::prep;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sg_core::models::{Entity, EventFilter, Meta, Name, User};
 
-//     tracing::info!(res = res.as_str());
-//     let serialized = serde_json::from_str::<ResponseObject<Shim<R::Res>>>(&res)
-//         .wrap_err("Failed to deserialize")
-//         .unwrap();
+#[test]
+fn test_new_user() {
+    let mut c = prep();
 
-//     Ok(serialized.data.into())
-// }
+    let res1 = c
+        .add_user(
+            "tg".to_owned(),
+            "TEST".to_owned(),
+            "http://placekitten.com/114/514".parse().unwrap(),
+            "Pop".to_owned(),
+        )
+        .unwrap()
+        .unwrap();
 
-// #[test]
-// fn test_new_user() {
-//     prep();
+    let User {
+        id,
+        im,
+        name,
+        avatar,
+        is_admin,
+        event_filter,
+        ..
+    } = &res1;
 
-//     let req = AddUser {
-//         im: "tg".to_owned(),
-//         avatar: "http://placekitten.com/114/514".parse().unwrap(),
-//         password: "TEST".to_owned(),
-//         name: "Pop".to_owned(),
-//     };
+    assert_eq!(im, "tg");
+    assert_eq!(name, "Pop");
+    assert_eq!(avatar.as_str(), "http://placekitten.com/114/514");
+    assert!(!is_admin);
+    assert_eq!(
+        event_filter,
+        &EventFilter {
+            entities: HashSet::default(),
+            kinds: HashSet::default(),
+        }
+    );
 
-//     let res1 = call(req).unwrap().unwrap();
+    tracing::info!(id = ?id, "New user added");
 
-//     let User {
-//         id,
-//         im,
-//         name,
-//         avatar,
-//         is_admin,
-//         event_filter,
-//     } = &res1;
+    let token = c
+        .new_token(UserQuery::ById { user_id: *id })
+        .unwrap()
+        .unwrap()
+        .token;
 
-//     assert_eq!(im, "tg");
-//     assert_eq!(name, "Pop");
-//     assert_eq!(avatar.as_str(), "http://placekitten.com/114/514");
-//     assert!(!is_admin);
-//     assert_eq!(
-//         event_filter,
-//         &EventFilter {
-//             entities: Default::default(),
-//             kinds: Default::default(),
-//         }
-//     );
+    // Pretend we are the new user
+    let admin_token = c.set_token(token).unwrap();
 
-//     tracing::info!(id = ?id, "New user added");
+    // Verify that the user is in the database
+    let res2 = c.auth_user().unwrap().unwrap().user;
 
-//     let token = new_session(*id).unwrap().unwrap().token;
+    assert_eq!(res1, res2);
 
-//     // Verify that the user is in the database
-//     let req = AuthUser {
-//         user_id: id.to_owned(),
-//         token: token.clone(),
-//     };
+    // Delete the new user
+    c.set_token(admin_token).unwrap();
+    let res3 = c
+        .del_user(UserQuery::ById { user_id: *id })
+        .unwrap()
+        .unwrap();
 
-//     let res2 = call(req).unwrap().unwrap().user;
+    assert_eq!(res2, res3);
 
-//     assert_eq!(res1, res2);
-
-//     // Delete the new user
-//     let req = DelUser {
-//         user_id: id.to_owned(),
-//         password: "TEST".to_owned(),
-//     };
-
-//     let res = call(req).unwrap().is_ok();
-//     assert!(res);
-
-//     // Verify that the user is no longer in the database
-//     assert!(call(AuthUser {
-//         user_id: id.to_owned(),
-//         token
-//     })
-//     .unwrap()
-//     .is_err());
-// }
+    // Verify that the user is no longer in the database
+    drop(c.auth_user().unwrap().unwrap_err());
+}
 
 // #[test]
 // fn test_new_user_wrong_password() {

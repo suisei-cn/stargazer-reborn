@@ -14,8 +14,8 @@ Represents an API Error. Implemented [`axum::response::IntoResponse`] trait.
 ## Format into JSON
 ```rust
 # use api::rpc::ApiError; fn main() {
-let resp = r#"{"data":{"error":["Cannot find user with ID `26721d57-37f5-458c-afea-2b18baf34925`"]},"success":false,"time":"2022-01-01T00:00:00.000000000Z"}"#;
-let mut resp_obj = ApiError::user_not_found(
+let resp = r#"{"data":{"error":["Not Found","Cannot find user with ID `26721d57-37f5-458c-afea-2b18baf34925`"]},"success":false,"time":"2022-01-01T00:00:00.000000000Z"}"#;
+let mut resp_obj = ApiError::user_not_found_with_id(
     &mongodb::bson::uuid::Uuid::parse_str("26721d57-37f5-458c-afea-2b18baf34925").unwrap(),
 ).packed();
 # resp_obj.time = "2022-01-01T00:00:00.000000000Z".to_owned();
@@ -28,10 +28,10 @@ assert_eq!(resp, resp_obj.to_json());
 Note: This requires feature `server`
 
 ```rust
-# use api::rpc::ApiError; fn main() {
+# use api::rpc::ApiError; use http::StatusCode; fn main() {
 use axum::response::IntoResponse;
 
-let error = ApiError::new(vec!["error1".to_string(), "error2".to_string()]);
+let error = ApiError::new(StatusCode::BAD_REQUEST).explain("Invalid request");
 let response = error.packed().into_response();
 # }
 ```

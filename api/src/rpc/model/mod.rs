@@ -65,6 +65,8 @@ crate::methods! {
     // ---------- //
     // Bot method //
     // ---------- //
+
+    /// Create a new token
     new_token := NewToken {
         /// Either (`user id`) or combination of (`im` and `im_payload`)
         /// that can be used to look up user

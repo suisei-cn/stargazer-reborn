@@ -24,7 +24,10 @@ use mongodb::{
 };
 use sg_auth::{Permission, PermissionSet};
 use sg_core::models::{Entity, EventFilter, Task, User};
-use tower_http::{cors, trace};
+use tower_http::{
+    cors,
+    trace::{self, DefaultOnRequest},
+};
 
 /// Construct the router.
 ///

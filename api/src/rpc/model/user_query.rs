@@ -47,7 +47,7 @@ mod test {
     #[test]
     fn test_user_query() {
         let obj = serde_json::json!({
-            "id": "5e9f8f8f-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
+            "user_id": "5e9f8f8f-f8f8-f8f8-f8f8-f8f8f8f8f8f8",
         });
 
         let test: Test = serde_json::from_value(obj).unwrap();
