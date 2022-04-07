@@ -2,7 +2,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 
-use eyre::{eyre, Result, WrapErr};
+use eyre::{bail, Result, WrapErr};
 use isolanguage_1::LanguageCode;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Uuid;
@@ -85,15 +85,19 @@ impl Event {
         entity: impl Into<Uuid>,
         fields: impl Serialize,
     ) -> Result<Self> {
+        let value = serde_json::to_value(fields)
+            .wrap_err("event fields can't be converted into json value")?;
+        let fields = match value {
+            Value::Null => Map::new(),
+            Value::Object(m) => m,
+            _ => bail!("event field is not a map"),
+        };
+
         Ok(Self {
             id: id.into(),
             kind: kind.to_string(),
             entity: entity.into(),
-            fields: serde_json::to_value(fields)
-                .wrap_err("event fields can't be converted into json value")?
-                .as_object()
-                .ok_or_else(|| eyre!("event field is not a map"))?
-                .clone(),
+            fields,
         })
     }
     /// Create a new event with its fields set by a serializable object.
