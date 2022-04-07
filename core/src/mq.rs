@@ -172,7 +172,7 @@ impl MessageQueue for RabbitMQ {
 }
 
 /// A set of middlewares.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Middlewares {
     middlewares: Vec<String>,
 }
