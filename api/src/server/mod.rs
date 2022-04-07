@@ -1,8 +1,5 @@
 use color_eyre::Result;
 
-#[cfg(test)]
-mod test;
-
 mod_use::mod_use![config, handler, jwt, context, ext];
 
 #[allow(clippy::missing_errors_doc)]

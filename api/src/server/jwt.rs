@@ -218,7 +218,7 @@ fn test_jwt() {
     let config = Config {
         bot_password: "Secret".to_string(),
         token_timeout: Duration::from_secs(1),
-        ..Default::default()
+        ..Config::default()
     };
 
     let mut jwt = JWTContext::new(&config);

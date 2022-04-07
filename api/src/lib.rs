@@ -6,6 +6,7 @@
 mod_use::mod_use![utils];
 
 pub mod rpc;
+pub use rpc::*;
 
 #[cfg(any(feature = "client", feature = "client_blocking"))]
 pub mod client;
@@ -13,4 +14,6 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-pub use rpc::*;
+#[cfg(test)]
+#[cfg(all(feature = "server", feature = "client_blocking"))]
+mod test;

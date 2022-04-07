@@ -57,7 +57,7 @@ mod prep {
                             bind: "127.0.0.1:8080".parse().unwrap(),
                             token_timeout: Duration::from_secs(0),
                             mongo_uri,
-                            ..Default::default()
+                            ..Config::default()
                         })
                         .await
                         .unwrap();
@@ -66,8 +66,8 @@ mod prep {
         });
 
         if !WAITED.load(Ordering::Acquire) {
-            WAITED.store(true, Ordering::Release);
             std::thread::sleep(Duration::from_secs(2));
+            WAITED.store(true, Ordering::Release);
         }
 
         let mut c = Client::new("http://127.0.0.1:8080/v1/").unwrap();
@@ -80,13 +80,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     model::UserQuery,
-    rpc::{
-        model::{
-            AddEntity, AddTask, AddTaskParam, AddUser, AuthUser, DelUser, GetEntities, NewToken,
-            Token, UpdateSetting,
-        },
-        ApiError, ApiResult, Request, ResponseObject,
-    },
+    rpc::{ApiError, ApiResult, Request, ResponseObject},
 };
 
 use color_eyre::{eyre::Context, Result};
@@ -161,59 +155,37 @@ fn test_new_user() {
     drop(c.auth_user().unwrap().unwrap_err());
 }
 
-// #[test]
-// fn test_new_user_wrong_password() {
-//     prep();
+#[test]
+fn test_get_entities() {
+    let c = prep();
 
-//     let req = AddUser {
-//         im: "tg".to_owned(),
-//         avatar: "http://placekitten.com/114/514".parse().unwrap(),
-//         password: "WRONG_PASSWORD".to_owned(),
-//         name: "Pop".to_owned(),
-//     };
+    let res = c.get_entities().unwrap().unwrap();
 
-//     let obj = call(req).unwrap();
+    tracing::info!(entities = ?res);
+}
 
-//     assert!(obj.is_err());
-//     assert!(obj
-//         .unwrap_err()
-//         .error
-//         .contains(&"Wrong password".to_owned()));
-// }
+#[test]
+fn test_delete_nonexist_user() {
+    let c = prep();
 
-// #[test]
-// fn test_get_entities() {
-//     prep();
+    let id = "eee29278-273e-4de9-a794-0a3de92f5c4b";
 
-//     let req = GetEntities {};
+    let res = c
+        .del_user(UserQuery::ById {
+            user_id: Uuid::parse_str(id).unwrap(),
+        })
+        .unwrap();
 
-//     let res = call(req).unwrap().unwrap();
-
-//     tracing::info!(entities = ?res);
-// }
-
-// #[test]
-// fn test_delete_nonexist_user() {
-//     prep();
-
-//     let id = "eee29278-273e-4de9-a794-0a3de92f5c4b";
-
-//     let req = DelUser {
-//         user_id: Uuid::parse_str(id).unwrap(),
-//         password: "TEST".to_owned(),
-//     };
-
-//     let res = call(req).unwrap();
-//     assert!(res.is_err());
-//     assert!(res
-//         .unwrap_err()
-//         .error
-//         .contains(&format!("Cannot find user with ID `{id}`")));
-// }
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .error
+        .contains(&format!("Cannot find user with ID `{id}`")));
+}
 
 // #[test]
 // fn test_update_user_settings() {
-//     prep();
+//     let c = prep();
 
 //     let user = AddUser {
 //         im: "tg".to_owned(),
@@ -256,7 +228,7 @@ fn test_new_user() {
 
 // #[test]
 // fn test_admin() {
-//     prep();
+//     let c = prep();
 
 //     let admin_id = Uuid::parse_str("7f04280b-1840-1006-ca6d-064b9bf680cd").unwrap();
 

@@ -52,24 +52,29 @@ pub mod model;
 
 /// A convenient macro to generate all RPC methods.
 ///
+/// Notice that this macro should only be called once.
+///
 /// # Example
 ///
-/// ```rust
-/// # use api::methods; use sg_core::model::User;
-///  methods! {
-///     // If response object has fields, define it and implement `Response` for it.
-///     get_user := GetUserSettings {
-///         user_id: String
-///     } -> UserSettings {
-///         settings: String
-///     },
+/// **NOTE**: this example is not compiling because some mysterious error where
+/// rust says i'm trying to inherent impl for types not in this crate.
+/// But it works perfectly fine outside doc test.
 ///
-///     // If response object is defined elsewhere, do not add brace.
-///     // This will only implement the trait instead of re-define it.
-///     get_user := GetUser {
-///         user_id: String
-///     } -> User
-/// }
+/// ```rust,compile_fail
+///
+/// #  struct DummyUser {}
+/// // If response object has fields, define it and implement `Response` for it.
+/// get_user_with_impl := GetUserWithImpl {
+///     user_id: String
+/// } -> UserSettings {
+///     settings: String
+/// },
+///
+/// // If response object is defined elsewhere, do not add brace.
+/// // This will only implement the trait instead of re-define it.
+/// get_user_test := GetUserTest {
+///     user_id: String
+/// } -> DummyUser
 /// ```
 #[macro_export]
 macro_rules! methods {
@@ -150,7 +155,8 @@ macro_rules! methods {
             use ::std::mem::size_of;
             $(
                 println!(
-                    "{} ({}B) -> {} ({}B)",
+                    "{} = {} ({}B) -> {} ({}B)",
+                    stringify!($method),
                     stringify!($req),
                     size_of::<$req>(),
                     stringify!($resp),
@@ -166,6 +172,7 @@ macro_rules! methods {
         #[allow(clippy::missing_errors_doc)]
         impl $crate::client::Client {
             $(
+                #[doc = concat!("Invoke RPC method [`", stringify!($method), "`](", stringify!($req), "), async version.")]
                 $( #[ $method_meta ] )*
                 ///
                 /// # Errors
@@ -182,6 +189,7 @@ macro_rules! methods {
         #[allow(clippy::missing_errors_doc)]
         impl $crate::client::blocking::Client {
             $(
+                #[doc = concat!("Invoke RPC method [`", stringify!($method), "`](", stringify!($req), "), blocking version.")]
                 $( #[ $method_meta ] )*
                 ///
                 /// # Errors
@@ -236,7 +244,7 @@ mod test_macro {
         get_user :=
         GetUser {
             user_id: String
-        } -> User {
+        } -> DummyUser {
             user_id: String,
             user_info: String
         }
@@ -254,7 +262,7 @@ mod test_macro {
             r#"{{"data":{{"user_id":"foo","user_info":"bar"}},"success":true,"time":"{}"}}"#,
             now
         );
-        let mut resp_obj = User {
+        let mut resp_obj = DummyUser {
             user_id: "foo".to_string(),
             user_info: "bar".to_string(),
         }
