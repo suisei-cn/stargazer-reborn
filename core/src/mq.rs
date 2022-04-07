@@ -56,6 +56,7 @@ impl<T: Deref<Target = dyn MessageQueue> + Send + Sync> MessageQueue for T {
 
 /// A message queue backed by `RabbitMQ`.
 pub struct RabbitMQ {
+    exchange: String,
     channel: Channel,
 }
 
@@ -64,7 +65,7 @@ impl RabbitMQ {
     ///
     /// # Errors
     /// Returns an error if the connection fails or the exchange can't be declared.
-    pub async fn new(addr: &str) -> Result<Self> {
+    pub async fn new(addr: &str, exchange: &str) -> Result<Self> {
         let channel = Connection::connect(
             addr,
             ConnectionProperties::default()
@@ -78,7 +79,7 @@ impl RabbitMQ {
         debug!("Declaring exchange");
         channel
             .exchange_declare(
-                "stargazer-reborn",
+                exchange,
                 ExchangeKind::Topic,
                 ExchangeDeclareOptions {
                     durable: true,
@@ -88,7 +89,10 @@ impl RabbitMQ {
             )
             .await?;
 
-        Ok(Self { channel })
+        Ok(Self {
+            exchange: exchange.to_string(),
+            channel,
+        })
     }
     async fn consume_connect(&self, middleware: Option<&str>) -> Result<Consumer> {
         let routing_key = middleware.map_or_else(
@@ -109,7 +113,7 @@ impl RabbitMQ {
         self.channel
             .queue_bind(
                 queue.name().as_str(),
-                "stargazer-reborn",
+                &self.exchange,
                 &routing_key,
                 QueueBindOptions::default(),
                 FieldTable::default(),
@@ -134,7 +138,7 @@ impl MessageQueue for RabbitMQ {
         drop(
             self.channel
                 .basic_publish(
-                    "stargazer-reborn",
+                    &self.exchange,
                     &iter::once(String::from("event"))
                         .chain(middlewares.into_iter())
                         .join("."),
@@ -280,7 +284,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn tests() {
-        let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672")
+        let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", "test")
             .await
             .unwrap();
         must_seq(&mq).await;
