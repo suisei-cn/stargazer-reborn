@@ -603,6 +603,7 @@ dependencies = [
  "tokio",
  "tokio-executor-trait",
  "tokio-reactor-trait",
+ "tokio-stream",
  "tokio-tungstenite",
  "tracing",
  "url",
@@ -2680,6 +2681,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util 0.6.9",
 ]
 
 [[package]]
