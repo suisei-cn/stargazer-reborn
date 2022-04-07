@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - run: rustup show
+      - run: rust update && rustup show
         name: Setup Cargo Toolchain 🛎️
       - uses: Swatinem/rust-cache@v1
       - uses: mbrobbel/rustfmt-check@master
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - run: rustup show
+      - run: rust update && rustup show
         name: Setup Cargo Toolchain 🛎️
       - uses: Swatinem/rust-cache@v1
       - name: Start MongoDB
@@ -42,9 +42,7 @@ jobs:
         with:
           mongodb-replica-set: rs0
       - uses: actions-rs/cargo@v1
-        name: Prepare cargo-nextest 🛎️
-        with:
-          command: install
-          args: --locked cargo-nextest
-      - run: cargo nextest run -P ci
         name: Running Tests 🚀
+        with:
+          command: test
+          args: --workspace
