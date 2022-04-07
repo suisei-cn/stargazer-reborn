@@ -211,3 +211,61 @@ impl IntoIterator for Middlewares {
         self.middlewares.into_iter()
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::pin::Pin;
+
+    use async_trait::async_trait;
+    use eyre::Result;
+    use futures_util::{Stream, StreamExt, TryStreamExt};
+    use tokio::sync::broadcast;
+    use tokio_stream::wrappers::BroadcastStream;
+
+    use crate::models::Event;
+    use crate::mq::{MessageQueue, Middlewares};
+
+    pub struct MockMQ {
+        tx: broadcast::Sender<(String, Event)>,
+    }
+
+    impl Default for MockMQ {
+        fn default() -> Self {
+            let (tx, _) = broadcast::channel(128);
+            Self { tx }
+        }
+    }
+
+    #[async_trait]
+    impl MessageQueue for MockMQ {
+        async fn publish(&self, event: Event, middlewares: Middlewares) -> Result<()> {
+            self.tx.send((format!("events.{}", middlewares), event))?;
+            Ok(())
+        }
+
+        async fn consume(
+            &self,
+            middleware: Option<&str>,
+        ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>>>> {
+            let interested = middleware.map(std::string::ToString::to_string);
+            Box::pin(
+                BroadcastStream::new(self.tx.subscribe())
+                    .try_filter_map(move |(key, event)| {
+                        let interested = interested.clone();
+                        async move {
+                            Ok(match interested {
+                                Some(middleware) if key.ends_with(&format!(".{}", middleware)) => {
+                                    Some((Middlewares::from_routing_key(&key), event))
+                                }
+                                None if !key.contains('.') => {
+                                    Some((Middlewares::from_routing_key(&key), event))
+                                }
+                                _ => None,
+                            })
+                        }
+                    })
+                    .map(|item| Ok(item?)),
+            )
+        }
+    }
+}

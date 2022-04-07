@@ -29,4 +29,5 @@ url = { version = "2.2.2", features = ["serde"] }
 uuid = "0.8"
 
 [dev-dependencies]
-tokio = { version = "1.17", features = ["rt", "time", "net"] }
+tokio = { version = "1.17", features = ["rt", "time", "net", "sync"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
