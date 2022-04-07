@@ -94,7 +94,7 @@ impl RabbitMQ {
             channel,
         })
     }
-    async fn consume_connect(&self, middleware: Option<&str>) -> Result<Consumer> {
+    async fn consumer_connect(&self, middleware: Option<&str>) -> Result<Consumer> {
         let routing_key = middleware.map_or_else(
             || String::from("event"),
             |middleware| format!("#.{}", middleware),
@@ -155,7 +155,7 @@ impl MessageQueue for RabbitMQ {
         &self,
         middleware: Option<&str>,
     ) -> Pin<Box<dyn Stream<Item = Result<(Middlewares, Event)>> + Send>> {
-        let consumer = self.consume_connect(middleware).await;
+        let consumer = self.consumer_connect(middleware).await;
         info!(middleware = ?middleware, "Listening for events.");
         match consumer {
             Ok(consumer) => Box::pin(consumer.map(|msg| match msg {
