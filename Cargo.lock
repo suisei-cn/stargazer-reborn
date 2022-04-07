@@ -588,6 +588,7 @@ dependencies = [
 name = "core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "eyre",
  "futures-util",
  "isolanguage-1",
