@@ -215,15 +215,19 @@ impl IntoIterator for Middlewares {
 #[cfg(test)]
 pub mod tests {
     use std::pin::Pin;
+    use std::time::Duration;
 
     use async_trait::async_trait;
     use eyre::Result;
     use futures_util::{Stream, StreamExt, TryStreamExt};
+    use mongodb::bson::Uuid;
+    use serde_json::json;
     use tokio::sync::broadcast;
+    use tokio::time::timeout;
     use tokio_stream::wrappers::BroadcastStream;
 
     use crate::models::Event;
-    use crate::mq::{MessageQueue, Middlewares};
+    use crate::mq::{MessageQueue, Middlewares, RabbitMQ};
 
     pub struct MockMQ {
         tx: broadcast::Sender<(String, Event)>,
@@ -271,6 +275,95 @@ pub mod tests {
                     })
                     .map(|item| Ok(item?)),
             )
+        }
+    }
+
+    #[tokio::test]
+    async fn tests() {
+        let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672")
+            .await
+            .unwrap();
+        must_seq(&mq).await;
+        must_filter(&mq).await;
+
+        let mq = MockMQ::default();
+        must_seq(&mq).await;
+        must_filter(&mq).await;
+    }
+
+    async fn must_filter(mq: &impl MessageQueue) {
+        let msg_a = Event::from_serializable("a", Uuid::new(), json!({"k": "va"})).unwrap();
+        let msg_b = Event::from_serializable("b", Uuid::new(), json!({"k": "vb"})).unwrap();
+        let msg_c = Event::from_serializable("c", Uuid::new(), json!({"k": "vc"})).unwrap();
+
+        let mut bare_consumer = mq.consume(None).await;
+        let mut mw_consumer = mq.consume(Some("mq_filter_test")).await;
+
+        mq.publish(msg_a.clone(), Middlewares::default())
+            .await
+            .unwrap();
+        mq.publish(msg_b.clone(), "mq_filter_test".parse().unwrap())
+            .await
+            .unwrap();
+        mq.publish(msg_c.clone(), "nested.mq_filter_test".parse().unwrap())
+            .await
+            .unwrap();
+        mq.publish(
+            msg_a.clone(),
+            "mq_filter_test.some_other_mw".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            bare_consumer.next().await.unwrap().unwrap(),
+            (Middlewares::default(), msg_a.clone()),
+            "bare consumer should receive the first message"
+        );
+        assert!(
+            timeout(Duration::from_millis(500), bare_consumer.next())
+                .await
+                .is_err(),
+            "bare consumer should receive nothing"
+        );
+
+        assert_eq!(
+            mw_consumer.next().await.unwrap().unwrap(),
+            (Middlewares::default(), msg_b.clone()),
+            "mw consumer should receive the second message"
+        );
+        assert_eq!(
+            mw_consumer.next().await.unwrap().unwrap(),
+            ("nested".parse().unwrap(), msg_c.clone()),
+            "mw consumer should receive the third message"
+        );
+        assert!(
+            timeout(Duration::from_millis(500), mw_consumer.next())
+                .await
+                .is_err(),
+            "mw consumer should receive nothing"
+        );
+    }
+
+    async fn must_seq(mq: &impl MessageQueue) {
+        let mut consumer = mq.consume(Some("mq_seq_test")).await;
+
+        for i in 1..100usize {
+            mq.publish(
+                Event::from_serializable(&i.to_string(), Uuid::new(), json!({})).unwrap(),
+                "mq_seq_test".parse().unwrap(),
+            )
+            .await
+            .unwrap();
+        }
+
+        for i in 1..100usize {
+            let (_, e) = consumer.next().await.unwrap().unwrap();
+            assert_eq!(
+                e.kind,
+                &*i.to_string(),
+                "messages should be received in sequence"
+            );
         }
     }
 }

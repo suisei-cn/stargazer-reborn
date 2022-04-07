@@ -135,8 +135,7 @@ async fn bililive_task(uid: u64, entity_id: Uuid, mq: impl MessageQueue) -> Resu
 
                     match LiveRoom::new(room_id).await {
                         Ok(room) => {
-                            let event =
-                                Event::from_serializable("bililive", entity_id, room)?;
+                            let event = Event::from_serializable("bililive", entity_id, room)?;
                             if let Err(error) = mq.publish(event, Middlewares::default()).await {
                                 error!(?error, "Failed to publish bililive event");
                             };
