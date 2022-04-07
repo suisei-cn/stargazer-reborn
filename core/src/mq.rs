@@ -239,7 +239,12 @@ pub mod tests {
     #[async_trait]
     impl MessageQueue for MockMQ {
         async fn publish(&self, event: Event, middlewares: Middlewares) -> Result<()> {
-            self.tx.send((format!("events.{}", middlewares), event))?;
+            let key = if middlewares.middlewares.is_empty() {
+                "events".to_string()
+            } else {
+                format!("events.{}", middlewares)
+            };
+            self.tx.send((key, event))?;
             Ok(())
         }
 
