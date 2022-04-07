@@ -14,6 +14,6 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-#[cfg(test)]
 #[cfg(all(feature = "server", feature = "client_blocking"))]
+#[cfg(test)]
 mod test;

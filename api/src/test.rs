@@ -76,19 +76,13 @@ mod prep {
     }
 }
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use crate::{
-    model::UserQuery,
-    rpc::{ApiError, ApiResult, Request, ResponseObject},
-};
+use crate::model::UserQuery;
 
-use color_eyre::{eyre::Context, Result};
-use isolanguage_1::LanguageCode;
-use mongodb::bson::{doc, Uuid};
+use mongodb::bson::Uuid;
 use prep::prep;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sg_core::models::{Entity, EventFilter, Meta, Name, User};
+use sg_core::models::{EventFilter, User};
 
 #[test]
 fn test_new_user() {
@@ -183,123 +177,46 @@ fn test_delete_nonexist_user() {
         .contains(&format!("Cannot find user with ID `{id}`")));
 }
 
-// #[test]
-// fn test_update_user_settings() {
-//     let c = prep();
+#[test]
+fn test_update_user_settings() {
+    let mut c = prep();
 
-//     let user = AddUser {
-//         im: "tg".to_owned(),
-//         avatar: "http://placekitten.com/114/514".parse().unwrap(),
-//         password: "TEST".to_owned(),
-//         name: "Pop".to_owned(),
-//     };
+    // Generate a new user
+    let user_id = c
+        .add_user(
+            "tg".to_owned(),
+            "TEST".to_owned(),
+            "http://placekitten.com/114/514".parse().unwrap(),
+            "Pop".to_owned(),
+        )
+        .unwrap()
+        .unwrap()
+        .id;
 
-//     let user_id = call(user).unwrap().unwrap().id;
+    // Get a token with current admin privilege
+    let token = c
+        .new_token(UserQuery::ById { user_id })
+        .unwrap()
+        .unwrap()
+        .token;
 
-//     let token = call(NewToken {
-//         password: "TEST".to_owned(),
-//         user_id,
-//     })
-//     .unwrap()
-//     .unwrap()
-//     .token;
+    // change to this user
+    c.set_token(token).unwrap();
 
-//     let event_filter = EventFilter {
-//         entities: HashSet::from_iter([
-//             Uuid::parse_str("a1e28c88-be24-48b0-b18a-81531e669905").unwrap()
-//         ]),
-//         kinds: HashSet::from_iter(["twitter/new_tweet".to_owned()]),
-//     };
+    // New event filter, a.k.a. setting
+    let event_filter = EventFilter {
+        entities: HashSet::from_iter([
+            Uuid::parse_str("a1e28c88-be24-48b0-b18a-81531e669905").unwrap()
+        ]),
+        kinds: HashSet::from_iter(["twitter/new_tweet".to_owned()]),
+    };
 
-//     let update = UpdateSetting {
-//         token,
-//         event_filter: event_filter.clone(),
-//     };
+    // Update setting on behalf of this user
+    c.update_setting(event_filter.clone()).unwrap().unwrap();
 
-//     let res = call(update).unwrap();
+    // Get new user info
+    let user = c.auth_user().unwrap().unwrap().user;
 
-//     assert!(res.is_ok());
-//     let token = new_session(user_id).unwrap().unwrap().token;
-
-//     let user = call(AuthUser { user_id, token }).unwrap().unwrap().user;
-
-//     assert_eq!(user.event_filter, event_filter);
-// }
-
-// #[test]
-// fn test_admin() {
-//     let c = prep();
-
-//     let admin_id = Uuid::parse_str("7f04280b-1840-1006-ca6d-064b9bf680cd").unwrap();
-
-//     // Get admin token
-//     let token = call(NewToken {
-//         password: "TEST".to_owned(),
-//         user_id: admin_id,
-//     })
-//     .unwrap()
-//     .unwrap()
-//     .token;
-
-//     let name = Name {
-//         name: HashMap::from_iter([(LanguageCode::En, "Test".to_owned())]),
-//         default_language: LanguageCode::En,
-//     };
-
-//     let new_ent = call(AddEntity {
-//         meta: Meta { name, group: None },
-//         token: token.clone(),
-//         tasks: vec![AddTaskParam::Youtube {
-//             channel_id: "TestChannel".to_owned(),
-//         }],
-//     })
-//     .unwrap()
-//     .unwrap();
-
-//     tracing::info!(?new_ent);
-
-//     let new_task = call(AddTask {
-//         entity_id: new_ent.id,
-//         token,
-//         param: AddTaskParam::Bilibili {
-//             uid: "Test".to_owned(),
-//         },
-//     })
-//     .unwrap()
-//     .unwrap();
-
-//     tracing::info!(?new_task);
-
-//     // new_ent.tasks.push(new_task);
-
-//     let ent_in_db = call(GetEntities {})
-//         .unwrap()
-//         .unwrap()
-//         .vtbs
-//         .into_iter()
-//         .find(|x| x.id == new_ent.id)
-//         .unwrap();
-
-//     assert_eq!(ent_in_db.tasks.len(), 2);
-//     assert!(ent_in_db.tasks.contains(&new_task.id));
-//     assert_eq!(ent_in_db.meta, new_ent.meta);
-// }
-
-// #[tokio::test]
-// async fn test_get_entity_from_db() {
-//     let col = mongodb::Client::with_uri_str(std::env::var("MONGODB_URI").unwrap())
-//         .await
-//         .unwrap()
-//         .database("stargazer-reborn")
-//         .collection::<Entity>("entities");
-
-//     let res = col
-//         .find_one(None, None)
-//         .await
-//         .unwrap()
-//         // .try_collect::<Vec<_>>()
-//         // .await
-//         .unwrap();
-
-//     println!("{:?}", res);
-// }
+    // Assert they are the equal
+    assert_eq!(user.event_filter, event_filter);
+}
