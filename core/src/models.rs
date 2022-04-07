@@ -126,8 +126,6 @@ pub struct User {
     pub name: String,
     /// Avatar of the user.
     pub avatar: Url,
-    /// Admin privilege of the user, this can be set via admin web ui.
-    pub is_admin: bool,
     /// The events that the user is subscribed to.
     pub event_filter: EventFilter,
 }
