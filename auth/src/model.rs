@@ -20,10 +20,19 @@ pub enum Permission {
 #[non_exhaustive]
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PermissionSet {
+    /// Privilege of API methods that requires bot privilege.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api: Option<Permission>,
+
+    /// Privilege of API methods that requires admin privilege
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub admin: Option<Permission>,
+
+    /// Message Queue access
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mq: Option<Permission>,
+
+    /// Cooridinator access
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coordinator: Option<Permission>,
 }
@@ -38,6 +47,7 @@ impl PermissionSet {
     pub(crate) const fn empty() -> Self {
         Self {
             api: None,
+            admin: None,
             mq: None,
             coordinator: None,
         }
@@ -46,6 +56,7 @@ impl PermissionSet {
     pub(crate) const fn full() -> Self {
         Self {
             api: Some(Permission::ReadWrite),
+            admin: Some(Permission::ReadWrite),
             mq: Some(Permission::ReadWrite),
             coordinator: Some(Permission::ReadWrite),
         }

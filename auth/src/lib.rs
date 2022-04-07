@@ -219,6 +219,7 @@ mod test {
         let password = b"test_password";
         let per = PermissionSet {
             api: Some(Permission::ReadOnly),
+            admin: Some(Permission::ReadOnly),
             mq: Some(Permission::ReadWrite),
             coordinator: None,
         };
