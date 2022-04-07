@@ -214,7 +214,7 @@ async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
                 .build(),
         )
         .await?
-        .ok_or_else(|| ApiError::user_not_found(&user_id))
+        .ok_or_else(|| ApiError::user_not_found_with_id(&user_id))
 }
 
 async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {

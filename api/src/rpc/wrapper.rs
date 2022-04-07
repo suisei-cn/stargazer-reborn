@@ -2,9 +2,10 @@
 
 use std::ops::{Deref, DerefMut};
 
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::{rpc::ApiError, timestamp};
+use crate::{rpc::ApiError, timestamp, Response};
 
 /// Wrapper for RPC response. Contains processed time, success indicator and payload. For more information, see [module doc](index.html#response).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +49,14 @@ impl<T> ResponseObject<T> {
     #[inline]
     pub const fn is_error(&self) -> bool {
         !self.success
+    }
+}
+
+impl<T: Response> ResponseObject<T> {
+    #[inline]
+    #[must_use]
+    pub fn status(&self) -> StatusCode {
+        self.data.status()
     }
 }
 

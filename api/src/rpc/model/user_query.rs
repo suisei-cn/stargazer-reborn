@@ -23,11 +23,10 @@ impl UserQuery {
         }
     }
 
-    #[must_use]
     pub fn as_error(&self) -> ApiError {
         match self {
-            UserQuery::ById { user_id: id } => ApiError::user_not_found(id),
-            UserQuery::ByIm { im, im_payload } => ApiError::user_not_found_from_im(im, im_payload),
+            UserQuery::ById { user_id: id } => ApiError::user_not_found_with_id(id),
+            UserQuery::ByIm { im, im_payload } => ApiError::user_not_found_with_im(im, im_payload),
         }
     }
 }

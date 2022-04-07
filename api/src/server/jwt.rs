@@ -176,7 +176,7 @@ where
         let token = request
             .headers()
             .get(http::header::AUTHORIZATION)
-            .ok_or_else(|| ApiError::unauthorized().into_response())?
+            .ok_or_else(|| ApiError::missing_token().into_response())?
             .to_str()
             .map_err(|_| {
                 ApiError::bad_request("Invalid header authentication encoding").into_response()

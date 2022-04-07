@@ -141,11 +141,7 @@ macro_rules! methods {
                     }
                 }
 
-                impl $crate::rpc::Response for $resp {
-                    fn is_successful(&self) -> bool {
-                        true
-                    }
-                }
+                $crate::successful_response!($resp);
             )?
         )*
 
@@ -218,8 +214,8 @@ macro_rules! successful_response {
     [ $( $ty:ty ),* ] => {
         $(
             impl $crate::rpc::Response for $ty {
-                fn is_successful(&self) -> bool {
-                    true
+                fn status(&self) -> ::http::StatusCode {
+                    ::http::StatusCode::OK
                 }
             }
         )*
@@ -276,7 +272,7 @@ mod test_macro {
             r#"{{"data":{{"error":["Cannot find user with ID `{id}`"]}},"success":false,"time":"{now}"}}"#,
         );
 
-        let mut resp_obj = ApiError::user_not_found(&Uuid::parse_str(id).unwrap()).packed();
+        let mut resp_obj = ApiError::user_not_found_with_id(&Uuid::parse_str(id).unwrap()).packed();
         resp_obj.time = now;
 
         assert_eq!(resp, resp_obj.to_json());

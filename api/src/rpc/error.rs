@@ -1,3 +1,4 @@
+use http::StatusCode;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -38,78 +39,93 @@ let response = error.packed().into_response();
 [`IntoResponse`]: axum::response::IntoResponse
 "##
 )]
+#[must_use]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
     pub error: Vec<String>,
+    #[serde(skip)]
+    status: StatusCode,
 }
 
 impl ApiError {
+    pub fn new(status: StatusCode) -> Self {
+        let error = match status.canonical_reason() {
+            Some(reason) => vec![reason.to_string()],
+            None => vec![],
+        };
+        Self { error, status }
+    }
+
+    /// Push an explanatory error message to the error list.
+    pub fn explain(mut self, error: impl Into<String>) -> Self {
+        self.error.push(error.into());
+        self
+    }
+
+    /// Throw multiple error explanation at once.
+    pub fn tirade<I, Item>(mut self, error: I) -> Self
+    where
+        Item: Into<String>,
+        I: IntoIterator<Item = Item>,
+    {
+        self.error.extend(error.into_iter().map(Into::into));
+        self
+    }
+
     #[must_use]
-    pub fn new(error: Vec<String>) -> Self {
-        Self { error }
+    pub const fn status(&self) -> StatusCode {
+        self.status
     }
 
     pub fn packed(self) -> ResponseObject<Self> {
         ResponseObject::error(self)
     }
 
-    #[must_use]
     pub fn bad_token() -> Self {
-        Self::new(vec![
-            "Bad token".to_owned(),
-            "It's either expired or in bad shape".to_owned(),
-        ])
+        Self::new(StatusCode::BAD_REQUEST).explain("Token is either expired or in bad shape")
     }
 
-    #[must_use]
+    pub fn missing_token() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED).explain("Token is missing")
+    }
+
     pub fn unauthorized() -> Self {
-        Self::new(vec![
-            "Unauthorized".to_owned(),
-            "Token is valid but does not have to sufficient privilege to access".to_owned(),
-        ])
+        Self::new(StatusCode::UNAUTHORIZED).explain("Not permitted to access")
     }
 
-    #[must_use]
-    pub fn wrong_password() -> Self {
-        Self::new(vec!["Wrong password".to_owned()])
+    pub fn user_not_found_with_id(user_id: &Uuid) -> Self {
+        Self::new(StatusCode::NOT_FOUND).explain(format!("Cannot find user with ID `{}`", user_id))
     }
 
-    #[must_use]
-    pub fn user_not_found(user_id: &Uuid) -> Self {
-        Self::new(vec![format!("Cannot find user with ID `{}`", user_id)])
-    }
-
-    pub fn user_not_found_from_im(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
-        Self::new(vec![format!(
+    pub fn user_not_found_with_im(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
+        Self::new(StatusCode::NOT_FOUND).explain(format!(
             "Cannot find user with im `{}` and im_payload `{}`",
             im.as_ref(),
             im_payload.as_ref()
-        )])
+        ))
     }
 
-    #[must_use]
     pub fn entity_not_found(entity_id: &Uuid) -> Self {
-        Self::new(vec![format!("Cannot find entity with ID `{}`", entity_id)])
+        Self::new(StatusCode::NOT_FOUND)
+            .explain(format!("Cannot find entity with ID `{}`", entity_id))
     }
 
-    #[must_use]
     pub fn task_not_found(task_id: &Uuid) -> Self {
-        Self::new(vec![format!("Cannot find task with ID `{}`", task_id)])
+        Self::new(StatusCode::NOT_FOUND).explain(format!("Cannot find task with ID `{}`", task_id))
     }
 
     pub fn bad_request(error: impl Into<String>) -> Self {
-        Self::new(vec!["Bad request".to_owned(), error.into()])
+        Self::new(StatusCode::BAD_REQUEST).explain(error)
     }
 
-    #[must_use]
     pub fn internal() -> Self {
-        Self::new(vec!["Internal Error".to_owned()])
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
 impl Response for ApiError {
-    fn is_successful(&self) -> bool {
-        false
+    fn status(&self) -> StatusCode {
+        self.status
     }
 }
 

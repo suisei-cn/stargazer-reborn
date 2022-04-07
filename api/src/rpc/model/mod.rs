@@ -11,7 +11,7 @@ use crate::successful_response;
 
 mod_use::mod_use![bot, null, admin, add_task, user_query];
 
-successful_response![Null, Entity, Task, User, Group];
+successful_response![Entity, Task, User, Group];
 
 crate::methods! {
     // ---------------------- //
