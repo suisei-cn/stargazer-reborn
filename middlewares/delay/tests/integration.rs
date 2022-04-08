@@ -1,4 +1,3 @@
-use std::fs;
 use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -80,10 +79,9 @@ async fn must_delay_and_send() {
 async fn must_delay_and_send_across_restart() {
     let exchange_name = format!("test_{}", rand::random::<usize>());
 
-    // Prepare temp dir.
-    let temp_dir = tempfile::tempdir().unwrap();
-    let db_path = temp_dir.path().join("test.db");
-    drop(fs::remove_file(&db_path));
+    // Prepare temp file.
+    let temp_file = tempfile::NamedTempFile::new().unwrap();
+    let db_path = temp_file.path();
 
     // Initialize messages to send and expect.
     let delay_at = SystemTime::now() + Duration::from_secs(7);
@@ -120,7 +118,7 @@ async fn must_delay_and_send_across_restart() {
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
         .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
-        .env("MIDDLEWARE_DATABASE_URL", &db_path)
+        .env("MIDDLEWARE_DATABASE_URL", db_path)
         .env("RUST_LOG", "info")
         .spawn()
         .unwrap();
@@ -139,7 +137,7 @@ async fn must_delay_and_send_across_restart() {
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
         .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
-        .env("MIDDLEWARE_DATABASE_URL", &db_path)
+        .env("MIDDLEWARE_DATABASE_URL", db_path)
         .spawn()
         .unwrap();
 

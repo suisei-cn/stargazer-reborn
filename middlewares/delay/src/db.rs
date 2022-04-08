@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::io::Write;
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::backend::Backend;
 use diesel::deserialize::FromSql;
 use diesel::serialize::{Output, ToSql};
@@ -23,6 +23,18 @@ pub struct DelayedMessage {
     pub body: Json<Event>,
     pub created_at: NaiveDateTime,
     pub deliver_at: NaiveDateTime,
+}
+
+impl DelayedMessage {
+    pub fn new(id: i64, middlewares: Middlewares, body: Event, deliver_at: NaiveDateTime) -> Self {
+        Self {
+            id,
+            middlewares: MiddlewaresWrapper(middlewares),
+            body: Json(body),
+            created_at: Utc::now().naive_utc(),
+            deliver_at,
+        }
+    }
 }
 
 #[derive(FromSqlRow, AsExpression, Serialize, Deserialize, Debug, Clone)]
