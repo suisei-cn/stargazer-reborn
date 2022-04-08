@@ -1,3 +1,5 @@
+//! Server implementation of the RPC API.
+
 use color_eyre::Result;
 
 mod_use::mod_use![config, handler, jwt, context, ext];

@@ -20,9 +20,6 @@
 //! Handler for this request will return the corresponding [`Response`] object,
 //! or an [`ApiError`] object represent an error during handling the request.
 //!
-//! For server, a convenient enum [`Requests`](model::Requests) is generated
-//! alone with all request objects to be deserialized from incoming JSON.
-//!
 //! ### Response
 //! **This trait Requires [`Serialize`](serde::ser::Serialize)**
 //!
@@ -42,9 +39,6 @@
 //! - Implement [`Request`] for that request struct.
 //! - If response object has fields, define it and implement [`Response`] for it.
 //! - If `client` feature is enabled, generate methods for [`Client`](crate::client::Client) to invoke RPC methods.
-//!
-//! **Notice**: This macro **MUST** only be called once in the module,
-//! otherwise duplicate definitions of [`Requests`](model::Requests) will be generated.
 
 mod_use::mod_use![wrapper, traits, error, ext];
 
@@ -166,21 +160,27 @@ macro_rules! methods {
         }
 
         #[cfg(any(feature = "client", feature = "client_blocking"))]
-        use $crate::{ApiResult, client::Result as ClientResult};
+        use $crate::{client::Result as ClientResult};
 
         #[cfg(feature = "client")]
         #[allow(clippy::missing_errors_doc)]
         impl $crate::client::Client {
             $(
-                #[doc = concat!("Invoke RPC method [`", stringify!($method), "`](", stringify!($req), "), async version.")]
                 $( #[ $method_meta ] )*
                 ///
+                #[doc = concat!("Invoke RPC method [`", stringify!($req), "`](", stringify!($req), "), asynchronously.")]
+                ///
                 /// # Errors
-                /// This returns a [`ClientResult`] that represents error occurred on client side,
-                /// like network error or serialization error.
-                /// It then wraps around an [`ApiResult`] which represents error occurred on server side.
-                pub async fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
-                    self.invoke($req { $( $req_field_name, )* }).await
+                /// Fails on several circumstances:
+                /// - Bad URL
+                /// - Failed to serialize request
+                /// - Failed on requesting, probably network or other external issue
+                /// - Failed to deserialize response
+                /// - Server respond with [`ApiError`](crate::rpc::ApiError)
+                ///
+                /// For more information about errors, see [`ClientError`](crate::client::Error).
+                pub async fn $method (&self, $( $req_field_name : impl Into<$req_field_type> + Send,)* ) -> ClientResult<$resp> {
+                    self.invoke(& $req { $( $req_field_name: $req_field_name .into(), )* }).await
                 }
             )*
         }
@@ -189,15 +189,21 @@ macro_rules! methods {
         #[allow(clippy::missing_errors_doc)]
         impl $crate::client::blocking::Client {
             $(
-                #[doc = concat!("Invoke RPC method [`", stringify!($method), "`](", stringify!($req), "), blocking version.")]
                 $( #[ $method_meta ] )*
                 ///
+                #[doc = concat!("Invoke RPC method [`", stringify!($req), "`](", stringify!($req), "), asynchronously.")]
+                ///
                 /// # Errors
-                /// This returns a [`ClientResult`] that represents error occurred on client side,
-                /// like network error or serialization error.
-                /// It then wraps around an [`ApiResult`] which represents error occurred on server side.
-                pub fn $method (&self, $( $req_field_name : $req_field_type,)* ) -> ClientResult<ApiResult<$resp>> {
-                    self.invoke(& $req { $( $req_field_name, )* })
+                /// Fails on several circumstances:
+                /// - Bad URL
+                /// - Failed to serialize request
+                /// - Failed on requesting, probably network or other external issue
+                /// - Failed to deserialize response
+                /// - Server respond with [`ApiError`](crate::rpc::ApiError)
+                ///
+                /// For more information about errors, see [`ClientError`](crate::client::Error).
+                pub fn $method (&self, $( $req_field_name : impl Into<$req_field_type>,)* ) -> ClientResult<$resp> {
+                    self.invoke(& $req { $( $req_field_name: $req_field_name .into(), )* })
                 }
             )*
         }

@@ -8,6 +8,8 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
     #[error("Unable to parse url: {0}")]
     Url(#[from] url::ParseError),
+    #[error("API error: {0}")]
+    Api(#[from] crate::rpc::ApiError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -69,7 +69,7 @@ mod prep {
         }
 
         let mut c = Client::new("http://127.0.0.1:8080/v1/").unwrap();
-        c.login_and_store("test", "test").unwrap().unwrap();
+        c.login_and_store("test", "test").unwrap();
         c
     }
 }
@@ -80,6 +80,7 @@ use crate::model::UserQuery;
 
 use mongodb::bson::Uuid;
 use prep::prep;
+use reqwest::Url;
 use sg_core::models::{EventFilter, User};
 
 #[test]
@@ -90,10 +91,9 @@ fn test_new_user() {
         .add_user(
             "tg".to_owned(),
             "TEST".to_owned(),
-            "http://placekitten.com/114/514".parse().unwrap(),
+            "http://placekitten.com/114/514".parse::<Url>().unwrap(),
             "Pop".to_owned(),
         )
-        .unwrap()
         .unwrap();
 
     let User {
@@ -118,38 +118,31 @@ fn test_new_user() {
 
     tracing::info!(id = ?id, "New user added");
 
-    let token = c
-        .new_token(UserQuery::ById { user_id: *id })
-        .unwrap()
-        .unwrap()
-        .token;
+    let token = c.new_token(UserQuery::ById { user_id: *id }).unwrap().token;
 
     // Pretend we are the new user
     let admin_token = c.set_token(token).unwrap();
 
     // Verify that the user is in the database
-    let res2 = c.auth_user().unwrap().unwrap().user;
+    let res2 = c.auth_user().unwrap().user;
 
     assert_eq!(res1, res2);
 
     // Delete the new user
     c.set_token(admin_token).unwrap();
-    let res3 = c
-        .del_user(UserQuery::ById { user_id: *id })
-        .unwrap()
-        .unwrap();
+    let res3 = c.del_user(UserQuery::ById { user_id: *id }).unwrap();
 
     assert_eq!(res2, res3);
 
     // Verify that the user is no longer in the database
-    drop(c.auth_user().unwrap().unwrap_err());
+    drop(c.auth_user().unwrap_err());
 }
 
 #[test]
 fn test_get_entities() {
     let c = prep();
 
-    c.get_entities().unwrap().unwrap();
+    c.get_entities().unwrap();
 }
 
 #[test]
@@ -162,13 +155,14 @@ fn test_delete_nonexist_user() {
         .del_user(UserQuery::ById {
             user_id: Uuid::parse_str(id).unwrap(),
         })
-        .unwrap();
+        .unwrap_err();
 
-    assert!(res.is_err());
-    assert!(res
-        .unwrap_err()
-        .error
-        .contains(&format!("Cannot find user with ID `{id}`")));
+    match res {
+        crate::client::Error::Api(e) => {
+            assert!(e.error[1].contains(&format!("Cannot find user with ID `{id}`")));
+        }
+        _ => panic!("Unexpected error: {:?}", res),
+    }
 }
 
 #[test]
@@ -180,19 +174,14 @@ fn test_update_user_settings() {
         .add_user(
             "tg".to_owned(),
             "TEST".to_owned(),
-            "http://placekitten.com/114/514".parse().unwrap(),
+            "http://placekitten.com/114/514".parse::<Url>().unwrap(),
             "Pop".to_owned(),
         )
-        .unwrap()
         .unwrap()
         .id;
 
     // Get a token with current admin privilege
-    let token = c
-        .new_token(UserQuery::ById { user_id })
-        .unwrap()
-        .unwrap()
-        .token;
+    let token = c.new_token(UserQuery::ById { user_id }).unwrap().token;
 
     // change to this user
     c.set_token(token).unwrap();
@@ -206,10 +195,10 @@ fn test_update_user_settings() {
     };
 
     // Update setting on behalf of this user
-    c.update_setting(event_filter.clone()).unwrap().unwrap();
+    c.update_setting(event_filter.clone()).unwrap();
 
     // Get new user info
-    let user = c.auth_user().unwrap().unwrap().user;
+    let user = c.auth_user().unwrap().user;
 
     // Assert they are the equal
     assert_eq!(user.event_filter, event_filter);

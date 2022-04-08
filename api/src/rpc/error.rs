@@ -1,3 +1,8 @@
+use std::{
+    error::Error as StdError,
+    fmt::{Display, Formatter},
+};
+
 use http::StatusCode;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
@@ -46,6 +51,20 @@ pub struct ApiError {
     #[serde(skip)]
     status: StatusCode,
 }
+
+impl Display for ApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Api Error: ")?;
+        write!(f, "[Status {}]", self.status.as_str())?;
+
+        self.error
+            .iter()
+            .map(String::as_str)
+            .try_for_each(|e| write!(f, " {},", e))
+    }
+}
+
+impl StdError for ApiError {}
 
 impl ApiError {
     pub fn new(status: StatusCode) -> Self {

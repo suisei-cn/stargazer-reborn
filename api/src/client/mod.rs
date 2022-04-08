@@ -1,3 +1,7 @@
+//! API Client, with both `blocking` and `non_blocking` implementation.
+//!
+//! This module requires either or both of `client` and `client_blocking` feature to use.
+
 use serde::{Deserialize, Serialize};
 
 use crate::rpc::{ApiError, ApiResult};

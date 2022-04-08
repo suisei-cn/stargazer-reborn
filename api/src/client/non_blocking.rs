@@ -6,6 +6,7 @@ use crate::{
     rpc::{ApiResult, Request, ResponseObject},
 };
 
+/// Non-blocking version of the client to invoke API methods.
 #[derive(Clone, Debug)]
 pub struct Client {
     client: reqwest::Client,
@@ -15,6 +16,8 @@ pub struct Client {
 
 impl Client {
     /// Creates new client instance.
+    ///
+    /// Note that URL should comes with api version in path and a trailing slash.
     ///
     /// # Errors
     /// Fails on invalid URL.
@@ -30,7 +33,7 @@ impl Client {
     ///
     /// # Errors
     /// Fails on invalid `Request` method, bad request body, network issue or bad response.
-    pub async fn invoke<R>(&self, req: R) -> Result<ApiResult<R::Res>>
+    pub async fn invoke<R>(&self, req: &R) -> Result<R::Res>
     where
         R: Request + Serialize + Send + Sync,
         R::Res: DeserializeOwned,
@@ -45,14 +48,15 @@ impl Client {
             req = req.bearer_auth(token);
         }
 
-        let resp = req
+        let resp: ApiResult<_> = req
             .send()
             .await?
             .json::<ResponseObject<Shim<R::Res>>>()
             .await?
             .data
             .into();
-        Ok(resp)
+
+        Ok(resp?)
     }
 
     pub fn set_token(&mut self, token: impl Into<String>) -> Option<String> {
@@ -65,6 +69,7 @@ impl Client {
     }
 
     /// Login and store the credential for future use.
+    /// Returns `Some(Token)` if there's already one stored.
     ///
     /// # Errors
     /// Fails on invalid `Login` method, bad request body, network issue or bad response.
@@ -72,13 +77,8 @@ impl Client {
         &mut self,
         username: impl Into<String> + Send,
         password: impl Into<String> + Send,
-    ) -> Result<ApiResult<()>> {
-        match self.login(username.into(), password.into()).await? {
-            Ok(token) => {
-                self.token.replace(token.token);
-                Ok(Ok(()))
-            }
-            Err(err) => Ok(Err(err)),
-        }
+    ) -> Result<Option<String>> {
+        let token = self.login(username.into(), password.into()).await?;
+        Ok(self.token.replace(token.token))
     }
 }
