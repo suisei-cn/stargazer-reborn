@@ -149,9 +149,7 @@ fn test_new_user() {
 fn test_get_entities() {
     let c = prep();
 
-    let res = c.get_entities().unwrap().unwrap();
-
-    tracing::info!(entities = ?res);
+    c.get_entities().unwrap().unwrap();
 }
 
 #[test]
