@@ -767,6 +767,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "tap",
  "tempfile",
  "tokio",
  "tracing",
