@@ -1,5 +1,5 @@
 //! Core definitions and protocols for Stargazer.
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, clippy::default_trait_access)]
 #![deny(missing_docs)]
 
 pub mod adapter;
