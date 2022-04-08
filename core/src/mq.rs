@@ -216,23 +216,21 @@ impl IntoIterator for Middlewares {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
+/// Mock implementations.
+#[cfg(any(test, feature = "mock"))]
+pub mod mock {
     use std::pin::Pin;
-    use std::time::Duration;
 
     use async_trait::async_trait;
     use eyre::Result;
     use futures_util::{Stream, StreamExt, TryStreamExt};
-    use mongodb::bson::Uuid;
-    use serde_json::json;
     use tokio::sync::broadcast;
-    use tokio::time::timeout;
     use tokio_stream::wrappers::BroadcastStream;
 
     use crate::models::Event;
-    use crate::mq::{MessageQueue, Middlewares, RabbitMQ};
+    use crate::mq::{MessageQueue, Middlewares};
 
+    /// A mock message queue.
     pub struct MockMQ {
         tx: broadcast::Sender<(String, Event)>,
     }
@@ -281,6 +279,21 @@ pub mod tests {
             )
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use futures_util::StreamExt;
+    use mongodb::bson::Uuid;
+    use serde_json::json;
+    use tokio::time::timeout;
+
+    use crate::models::Event;
+    #[cfg(feature = "mock")]
+    use crate::mq::mock::MockMQ;
+    use crate::mq::{MessageQueue, Middlewares, RabbitMQ};
 
     #[tokio::test]
     async fn tests() {
@@ -290,9 +303,12 @@ pub mod tests {
         must_seq(&mq).await;
         must_filter(&mq).await;
 
-        let mq = MockMQ::default();
-        must_seq(&mq).await;
-        must_filter(&mq).await;
+        #[cfg(feature = "mock")]
+        {
+            let mq = MockMQ::default();
+            must_seq(&mq).await;
+            must_filter(&mq).await;
+        }
     }
 
     async fn must_filter(mq: &impl MessageQueue) {
