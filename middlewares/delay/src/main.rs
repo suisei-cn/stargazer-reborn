@@ -5,7 +5,7 @@ extern crate diesel_migrations;
 
 use std::sync::Arc;
 
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use eyre::Context;
@@ -17,7 +17,7 @@ use tracing_subscriber::EnvFilter;
 use sg_core::mq::{MessageQueue, RabbitMQ};
 
 use crate::config::Config;
-use crate::db::{DelayedMessage, Json, MiddlewaresWrapper};
+use crate::db::DelayedMessage;
 use crate::scheduler::Scheduler;
 use crate::schema::delayed_messages::dsl::delayed_messages;
 
@@ -64,13 +64,7 @@ async fn main() -> Result<()> {
                 .and_then(|v| v.as_i64())
                 .map(|i| NaiveDateTime::from_timestamp(i, 0)),
         ) {
-            let delayed_message = DelayedMessage {
-                id,
-                middlewares: MiddlewaresWrapper(next),
-                body: Json(event),
-                created_at: Utc::now().naive_utc(),
-                deliver_at,
-            };
+            let delayed_message = DelayedMessage::new(id, next, event, deliver_at);
             scheduler.add_task(delayed_message, true);
         }
     }

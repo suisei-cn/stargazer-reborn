@@ -142,3 +142,96 @@ impl Scheduler {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use chrono::Utc;
+    use diesel::r2d2::{ConnectionManager, Pool};
+    use diesel::{RunQueryDsl, SqliteConnection};
+    use tokio::time::sleep;
+    use uuid::Uuid;
+
+    use sg_core::models::Event;
+    use sg_core::mq::mock::MockMQ;
+    use sg_core::mq::Middlewares;
+
+    use crate::{delayed_messages, embedded_migrations, DelayedMessage, Scheduler};
+
+    #[tokio::test]
+    async fn must_persist() {
+        test_persist(false).await;
+    }
+
+    #[tokio::test]
+    async fn must_cleanup() {
+        test_persist(true).await;
+    }
+
+    async fn test_persist(cleanup: bool) {
+        // Prepare temp file.
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_string_lossy().to_string();
+
+        // Prepare the db.
+        let pool = Pool::new(ConnectionManager::new(&db_path)).unwrap();
+        embedded_migrations::run(&pool.get().unwrap()).unwrap();
+
+        let mq = MockMQ::default();
+
+        {
+            let scheduler = Arc::new(Scheduler::new(pool, mq));
+
+            let msg = DelayedMessage::new(
+                114_514,
+                Middlewares::default(),
+                Event::from_serializable("", Uuid::nil(), ()).unwrap(),
+                Utc::now().naive_utc() + chrono::Duration::milliseconds(500), // Deliver the message later so it may be added to the queue.
+            );
+            scheduler.add_task(msg, true);
+            assert_eq!(
+                scheduler.delayed_messages.lock().len(),
+                1,
+                "There should be one delayed message"
+            );
+        }
+        // Now the scheduler is out of scope.
+
+        if cleanup {
+            // We wait for the message to expire.
+            sleep(std::time::Duration::from_secs(1)).await;
+        }
+
+        // Now load the db again.
+        let pool = Pool::new(ConnectionManager::new(&db_path)).unwrap();
+        let mq = MockMQ::default();
+        let scheduler = Arc::new(Scheduler::new(pool, mq));
+        if cleanup {
+            scheduler.cleanup();
+        }
+        scheduler.load();
+
+        if cleanup {
+            assert!(
+                scheduler.delayed_messages.lock().is_empty(),
+                "There should be no delayed messages"
+            );
+
+            // And we make sure the entry in db is removed.
+            let pool = Pool::new(ConnectionManager::<SqliteConnection>::new(&db_path)).unwrap();
+            let conn = pool.get().expect("No db conn available");
+            let results = delayed_messages.load::<DelayedMessage>(&conn).unwrap();
+            assert!(
+                results.is_empty(),
+                "There should be no delayed messages in db"
+            );
+        } else {
+            assert_eq!(
+                scheduler.delayed_messages.lock().len(),
+                1,
+                "There should be one delayed messages"
+            );
+        }
+    }
+}
