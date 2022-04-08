@@ -765,6 +765,7 @@ dependencies = [
  "futures-util",
  "parking_lot 0.12.0",
  "rand",
+ "rstest",
  "serde",
  "serde_json",
  "tap",
@@ -1463,9 +1464,9 @@ dependencies = [
 
 [[package]]
 name = "lapin"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afe666f160ceed00abc310aa2fa58295664cf892ebffc857bbf9b754c78122ce"
+checksum = "bd03ea5831b44775e296239a64851e2fd14a80a363d202ba147009ffc994ff0f"
 dependencies = [
  "amq-protocol",
  "async-global-executor-trait",
@@ -2281,6 +2282,19 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
+]
+
+[[package]]
+name = "rstest"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d912f35156a3f99a66ee3e11ac2e0b3f34ac85a07e05263d05a7e2c8810d616f"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "rustc_version",
+ "syn",
 ]
 
 [[package]]

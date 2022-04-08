@@ -159,17 +159,29 @@ mod tests {
 
     use crate::{delayed_messages, embedded_migrations, DelayedMessage, Scheduler};
 
+    #[derive(Debug, Eq, PartialEq)]
+    enum TestAction {
+        Normal,
+        Cleanup,
+        Cancel,
+    }
+
     #[tokio::test]
     async fn must_persist() {
-        test_persist(false).await;
+        test_persist(TestAction::Normal).await;
+    }
+
+    #[tokio::test]
+    async fn must_cancel() {
+        test_persist(TestAction::Cancel).await;
     }
 
     #[tokio::test]
     async fn must_cleanup() {
-        test_persist(true).await;
+        test_persist(TestAction::Cleanup).await;
     }
 
-    async fn test_persist(cleanup: bool) {
+    async fn test_persist(action: TestAction) {
         // Prepare temp file.
         let temp_file = tempfile::NamedTempFile::new().unwrap();
         let db_path = temp_file.path().to_string_lossy().to_string();
@@ -195,43 +207,60 @@ mod tests {
                 1,
                 "There should be one delayed message"
             );
+
+            if action == TestAction::Cancel {
+                scheduler.remove_task(114_514);
+                assert!(
+                    scheduler.delayed_messages.lock().is_empty(),
+                    "There should be no delayed messages"
+                );
+            }
         }
         // Now the scheduler is out of scope.
 
-        if cleanup {
+        if action == TestAction::Cleanup {
             // We wait for the message to expire.
-            sleep(std::time::Duration::from_secs(1)).await;
+            sleep(std::time::Duration::from_secs(2)).await;
         }
 
         // Now load the db again.
         let pool = Pool::new(ConnectionManager::new(&db_path)).unwrap();
         let mq = MockMQ::default();
         let scheduler = Arc::new(Scheduler::new(pool, mq));
-        if cleanup {
+        if action == TestAction::Cleanup {
             scheduler.cleanup();
         }
         scheduler.load();
 
-        if cleanup {
-            assert!(
-                scheduler.delayed_messages.lock().is_empty(),
-                "There should be no delayed messages"
-            );
+        match action {
+            TestAction::Normal => {
+                assert_eq!(
+                    scheduler.delayed_messages.lock().len(),
+                    1,
+                    "There should be one delayed messages"
+                );
+            }
+            TestAction::Cleanup => {
+                assert!(
+                    scheduler.delayed_messages.lock().is_empty(),
+                    "There should be no delayed messages"
+                );
 
-            // And we make sure the entry in db is removed.
-            let pool = Pool::new(ConnectionManager::<SqliteConnection>::new(&db_path)).unwrap();
-            let conn = pool.get().expect("No db conn available");
-            let results = delayed_messages.load::<DelayedMessage>(&conn).unwrap();
-            assert!(
-                results.is_empty(),
-                "There should be no delayed messages in db"
-            );
-        } else {
-            assert_eq!(
-                scheduler.delayed_messages.lock().len(),
-                1,
-                "There should be one delayed messages"
-            );
+                // And we make sure the entry in db is removed.
+                let pool = Pool::new(ConnectionManager::<SqliteConnection>::new(&db_path)).unwrap();
+                let conn = pool.get().expect("No db conn available");
+                let results = delayed_messages.load::<DelayedMessage>(&conn).unwrap();
+                assert!(
+                    results.is_empty(),
+                    "There should be no delayed messages in db"
+                );
+            }
+            TestAction::Cancel => {
+                assert!(
+                    scheduler.delayed_messages.lock().is_empty(),
+                    "There should be no delayed messages"
+                );
+            }
         }
     }
 }

@@ -3,40 +3,29 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use assert_cmd::cargo::CommandCargoExt;
 use futures_util::StreamExt;
-use serde_json::json;
+use rstest::rstest;
+use serde_json::{json, Value};
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 use sg_core::models::Event;
 use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
+#[rstest]
+#[case(json ! ({"a": "b"}), json ! ({"a": "b"}))]
+#[case(json ! ({"a": "b", "x-delay-cancel": false}), json ! ({"a": "b"}))]
 #[tokio::test(flavor = "multi_thread")]
-async fn must_delay_and_send() {
+async fn must_delay_and_send(#[case] mut event: Value, #[case] expected_event: Value) {
     let exchange_name = format!("test_{}", rand::random::<usize>());
 
     // Initialize messages to send and expect.
     let delay_at = SystemTime::now() + Duration::from_secs(5);
     let ts = delay_at.duration_since(UNIX_EPOCH).unwrap().as_secs();
-    let original = Event::from_serializable_with_id(
-        Uuid::nil(),
-        "",
-        Uuid::nil(),
-        json!({
-            "a": "b",
-            "x-delay-id": 114_514,
-            "x-delay-at": ts
-        }),
-    )
-    .unwrap();
-    let expected = Event::from_serializable_with_id(
-        Uuid::nil(),
-        "",
-        Uuid::nil(),
-        json!({
-            "a": "b",
-        }),
-    )
-    .unwrap();
+    event["x-delay-id"] = json!(114_514);
+    event["x-delay-at"] = json!(ts);
+    let original = Event::from_serializable_with_id(Uuid::nil(), "", Uuid::nil(), event).unwrap();
+    let expected =
+        Event::from_serializable_with_id(Uuid::nil(), "", Uuid::nil(), expected_event).unwrap();
 
     // Connect to MQ.
     let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
@@ -68,6 +57,65 @@ async fn must_delay_and_send() {
 
     // There must be only one message.
     assert!(timeout(Duration::from_secs(1), consumer.next())
+        .await
+        .is_err());
+
+    // Shutdown the middleware.
+    program.kill().unwrap();
+}
+
+#[rstest]
+#[case(json ! ({}))]
+#[case(json ! ({"x-delay-at": 1_919_810}))]
+#[case(json ! ({"matchy": "cute"}))]
+#[tokio::test(flavor = "multi_thread")]
+async fn must_cancel(#[case] mut event: Value) {
+    let exchange_name = format!("test_{}", rand::random::<usize>());
+
+    // Initialize messages to send and expect.
+    let delay_at = SystemTime::now() + Duration::from_secs(5);
+    let ts = delay_at.duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let original = Event::from_serializable(
+        "",
+        Uuid::nil(),
+        json!({
+            "a": "b",
+            "x-delay-id": 114_514,
+            "x-delay-at": ts
+        }),
+    )
+    .unwrap();
+    event["x-delay-id"] = json!(114_514);
+    event["x-delay-cancel"] = json!(true);
+    let cancel = Event::from_serializable("", Uuid::nil(), event).unwrap();
+
+    // Connect to MQ.
+    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
+        .await
+        .unwrap();
+    let mut consumer = mq.consume(Some("delay_cancel_debug")).await;
+
+    // Start delay middleware.
+    let mut program = Command::cargo_bin("delay")
+        .unwrap()
+        .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
+        .env("MIDDLEWARE_DATABASE_URL", ":memory:")
+        .spawn()
+        .unwrap();
+    sleep(Duration::from_secs(1)).await;
+
+    // Publish a test message.
+    mq.publish(original, "delay_cancel_debug.delay".parse().unwrap())
+        .await
+        .unwrap();
+    // And then cancel it.
+    mq.publish(cancel, "delay_cancel_debug.delay".parse().unwrap())
+        .await
+        .unwrap();
+
+    // Should not receive any message.
+    assert!(timeout(Duration::from_secs(6), consumer.next())
         .await
         .is_err());
 
