@@ -1,3 +1,4 @@
+use std::fs;
 use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -10,8 +11,10 @@ use uuid::Uuid;
 use sg_core::models::Event;
 use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn must_delay_and_send() {
+    let exchange_name = format!("test_{}", rand::random::<usize>());
+
     // Initialize messages to send and expect.
     let delay_at = SystemTime::now() + Duration::from_secs(5);
     let ts = delay_at.duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -23,17 +26,21 @@ async fn must_delay_and_send() {
             "a": "b",
             "x-delay-id": 114_514,
             "x-delay-at": ts
-        })).unwrap();
+        }),
+    )
+    .unwrap();
     let expected = Event::from_serializable_with_id(
         Uuid::nil(),
         "",
         Uuid::nil(),
         json!({
             "a": "b",
-        })).unwrap();
+        }),
+    )
+    .unwrap();
 
     // Connect to MQ.
-    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", "test")
+    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
         .await
         .unwrap();
     let mut consumer = mq.consume(Some("delay_debug")).await;
@@ -42,7 +49,7 @@ async fn must_delay_and_send() {
     let mut program = Command::cargo_bin("delay")
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
-        .env("MIDDLEWARE_AMQP_EXCHANGE", "test")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
         .env("MIDDLEWARE_DATABASE_URL", ":memory:")
         .spawn()
         .unwrap();
@@ -69,11 +76,14 @@ async fn must_delay_and_send() {
     program.kill().unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn must_delay_and_send_across_restart() {
+    let exchange_name = format!("test_{}", rand::random::<usize>());
+
     // Prepare temp dir.
     let temp_dir = tempfile::tempdir().unwrap();
     let db_path = temp_dir.path().join("test.db");
+    drop(fs::remove_file(&db_path));
 
     // Initialize messages to send and expect.
     let delay_at = SystemTime::now() + Duration::from_secs(7);
@@ -100,7 +110,7 @@ async fn must_delay_and_send_across_restart() {
     .unwrap();
 
     // Connect to MQ.
-    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", "test")
+    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
         .await
         .unwrap();
     let mut consumer = mq.consume(Some("delay_persist_debug")).await;
@@ -109,8 +119,9 @@ async fn must_delay_and_send_across_restart() {
     let mut program = Command::cargo_bin("delay")
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
-        .env("MIDDLEWARE_AMQP_EXCHANGE", "test")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
         .env("MIDDLEWARE_DATABASE_URL", &db_path)
+        .env("RUST_LOG", "info")
         .spawn()
         .unwrap();
     sleep(Duration::from_secs(1)).await;
@@ -127,7 +138,7 @@ async fn must_delay_and_send_across_restart() {
     let mut program = Command::cargo_bin("delay")
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
-        .env("MIDDLEWARE_AMQP_EXCHANGE", "test")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
         .env("MIDDLEWARE_DATABASE_URL", &db_path)
         .spawn()
         .unwrap();

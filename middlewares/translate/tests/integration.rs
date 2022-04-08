@@ -10,8 +10,10 @@ use uuid::Uuid;
 use sg_core::models::Event;
 use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn must_translate_and_put_back() {
+    let exchange_name = format!("test_{}", rand::random::<usize>());
+
     let original = Event {
         id: Uuid::nil().into(),
         kind: "".to_string(),
@@ -47,12 +49,12 @@ async fn must_translate_and_put_back() {
     let mut program = Command::cargo_bin("translate")
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
-        .env("MIDDLEWARE_AMQP_EXCHANGE", "test")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
         .env("MIDDLEWARE_DEBUG", "true")
         .spawn()
         .unwrap();
 
-    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", "test")
+    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
         .await
         .unwrap();
     let mut consumer = mq.consume(Some("translate_debug")).await;
