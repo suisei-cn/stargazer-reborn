@@ -66,7 +66,8 @@ crate::methods! {
     // Bot method //
     // ---------- //
 
-    /// Create a new token
+    /// Create a new token for an user,
+    /// which has `User` privilege and carries a non-nil `user_id`
     new_token := NewToken {
         /// Either (`user id`) or combination of (`im` and `im_payload`)
         /// that can be used to look up user

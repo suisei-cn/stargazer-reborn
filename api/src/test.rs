@@ -1,6 +1,5 @@
 mod prep {
     use std::{
-        env,
         sync::{
             atomic::{AtomicBool, Ordering},
             Once,
@@ -9,7 +8,6 @@ mod prep {
         time::Duration,
     };
 
-    use once_cell::sync::Lazy;
     use sg_auth::{AuthClient, PermissionRecord, PermissionSet};
     use tracing::metadata::LevelFilter;
 
@@ -103,7 +101,6 @@ fn test_new_user() {
         im,
         name,
         avatar,
-        is_admin,
         event_filter,
         ..
     } = &res1;
@@ -111,7 +108,6 @@ fn test_new_user() {
     assert_eq!(im, "tg");
     assert_eq!(name, "Pop");
     assert_eq!(avatar.as_str(), "http://placekitten.com/114/514");
-    assert!(!is_admin);
     assert_eq!(
         event_filter,
         &EventFilter {

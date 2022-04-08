@@ -241,7 +241,6 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
         im_payload,
         avatar,
         name,
-        is_admin: false,
         event_filter: EventFilter {
             entities: HashSet::default(),
             kinds: HashSet::default(),
@@ -279,13 +278,7 @@ async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
 
     let user = ctx.find_user(query).await?;
 
-    let prv = if user.is_admin {
-        Privilege::Admin
-    } else {
-        Privilege::User
-    };
-
-    let (token, claim) = ctx.encode(&user.id, prv)?;
+    let (token, claim) = ctx.encode(&user.id, Privilege::User)?;
 
     Ok(Token {
         token,

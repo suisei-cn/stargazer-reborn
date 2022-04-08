@@ -95,7 +95,6 @@ fn gen_user(event_filter: EventFilter) -> User {
         avatar: "http://placekitten.com/114/514".parse().unwrap(),
         im: ["tg", "qq"].choose(&mut rng).unwrap().to_owned().to_owned(),
         im_payload: Faker.fake(),
-        is_admin: false,
     }
 }
 
@@ -172,14 +171,9 @@ async fn get_avg_time_with_user_count(
 
     let entities: [uuid::Uuid; 32] = Faker.fake();
 
-    let mut data: Vec<User> = (0..user_count)
+    let data: Vec<User> = (0..user_count)
         .map(|_| gen_user(gen_ef(&mut rng, entities.as_slice())))
         .collect();
-
-    let lucky_one = data.choose_mut(&mut rng).unwrap();
-    lucky_one.is_admin = true;
-
-    tracing::info!(id = %lucky_one.id, "Admin");
 
     users.insert_many(data, None).await?;
 

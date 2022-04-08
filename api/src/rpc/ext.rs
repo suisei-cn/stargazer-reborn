@@ -1,30 +1,9 @@
 //! Contains several extensive traits for core models;
 
 use mongodb::bson::Uuid;
-use sg_core::models::{Task, User};
+use sg_core::models::Task;
 
-use crate::{
-    map,
-    rpc::{model::AddTask, ApiError, ApiResult},
-};
-
-pub trait UserExt: Sized {
-    /// Assert a user is admin
-    ///
-    /// # Errors
-    /// Returns [`ApiError::Unauthorized`] if the user is not admin.
-    fn assert_admin(self) -> ApiResult<Self>;
-}
-
-impl UserExt for User {
-    fn assert_admin(self) -> ApiResult<Self> {
-        if self.is_admin {
-            Ok(self)
-        } else {
-            Err(ApiError::unauthorized())
-        }
-    }
-}
+use crate::{map, rpc::model::AddTask};
 
 pub trait TaskExt: Sized {
     fn new_youtube(channel_id: impl Into<String>, parent: Uuid) -> Self;
