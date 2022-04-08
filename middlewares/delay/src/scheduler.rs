@@ -44,7 +44,7 @@ impl DelayedTask {
                     }
                 }
                 Err(error) => {
-                    error!(%event_id, %x_delay_id, ?error, "Deliver time is in the past");
+                    error!(%event_id, %x_delay_id, ?error, "!!!INVARIANT_NOT_HOLD: Deliver time is in the past");
                 }
             }
             if let Some(scheduler) = scheduler.upgrade() {
@@ -70,6 +70,13 @@ impl Scheduler {
     }
     #[allow(clippy::cognitive_complexity)]
     pub fn add_task(self: &Arc<Self>, msg: DelayedMessage, persist: bool) {
+        if msg.deliver_at <= Utc::now().naive_utc() {
+            let x_delay_id = msg.id;
+            let event_id = msg.body.0.id;
+            error!(%event_id, %x_delay_id, "Deliver time is in the past");
+            return;
+        }
+
         if persist {
             let conn = self.pool.get().unwrap();
             let r = diesel::insert_into(delayed_messages::table())

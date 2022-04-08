@@ -65,6 +65,109 @@ async fn must_delay_and_send(#[case] mut event: Value, #[case] expected_event: V
 }
 
 #[rstest]
+#[case(true)]
+#[case(false)]
+#[tokio::test(flavor = "multi_thread")]
+async fn must_reschedule(#[case] earlier_than_now: bool) {
+    let exchange_name = format!("test_{}", rand::random::<usize>());
+
+    // Initialize messages to send and expect.
+
+    // The delivery time of the second request.
+    let second_delay_at = if earlier_than_now {
+        // This should be rejected
+        SystemTime::now() - Duration::from_secs(5)
+    } else {
+        SystemTime::now() + Duration::from_secs(5)
+    };
+    let second_ts = second_delay_at
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    // The delivery time of the first request.
+    let first_delay_at = SystemTime::now() + Duration::from_secs(2);
+    let first_ts = first_delay_at.duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+    let first_request = Event::from_serializable_with_id(
+        Uuid::nil(),
+        "",
+        Uuid::nil(),
+        json!({
+            "c": "d",
+            "x-delay-id": 114_514,
+            "x-delay-at": first_ts
+        }),
+    )
+    .unwrap();
+    let second_request = Event::from_serializable_with_id(
+        Uuid::nil(),
+        "",
+        Uuid::nil(),
+        json!({
+            "a": "b",
+            "x-delay-id": 114_514,
+            "x-delay-at": second_ts
+        }),
+    )
+    .unwrap();
+    let expected = if earlier_than_now {
+        Event::from_serializable_with_id(Uuid::nil(), "", Uuid::nil(), json!({"c": "d"})).unwrap()
+    } else {
+        Event::from_serializable_with_id(Uuid::nil(), "", Uuid::nil(), json!({"a": "b"})).unwrap()
+    };
+
+    // Connect to MQ.
+    let mq = RabbitMQ::new("amqp://guest:guest@localhost:5672", &exchange_name)
+        .await
+        .unwrap();
+    let mut consumer = mq.consume(Some("delay_reschedule_debug")).await;
+
+    // Start delay middleware.
+    let mut program = Command::cargo_bin("delay")
+        .unwrap()
+        .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
+        .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
+        .env("MIDDLEWARE_DATABASE_URL", ":memory:")
+        .spawn()
+        .unwrap();
+    sleep(Duration::from_secs(1)).await;
+
+    // Publish requests.
+    mq.publish(
+        first_request,
+        "delay_reschedule_debug.delay".parse().unwrap(),
+    )
+    .await
+    .unwrap();
+    mq.publish(
+        second_request,
+        "delay_reschedule_debug.delay".parse().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Receive the delayed message and check its content & deliver time.
+    let expected_receive_time = if earlier_than_now {
+        first_delay_at
+    } else {
+        second_delay_at
+    };
+    let msg = consumer.next().await.unwrap().unwrap();
+    let received_time = SystemTime::now();
+    assert_eq!(msg, (Middlewares::default(), expected));
+    let delta = time_diff_abs(expected_receive_time, received_time);
+    assert!(delta < Duration::from_millis(1500));
+
+    // There must be only one message.
+    assert!(timeout(Duration::from_secs(4), consumer.next())
+        .await
+        .is_err());
+
+    // Shutdown the middleware.
+    program.kill().unwrap();
+}
+
+#[rstest]
 #[case(json ! ({}))]
 #[case(json ! ({"x-delay-at": 1_919_810}))]
 #[case(json ! ({"matchy": "cute"}))]
