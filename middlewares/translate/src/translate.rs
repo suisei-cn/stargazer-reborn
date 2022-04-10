@@ -73,6 +73,7 @@ impl Translator for BaiduTranslator {
             .query(&[("appid", self.app_id)])
             .query(&[("salt", salt)])
             .query(&[("sign", sign)])
+            .query(&[("action", 1)])
             .send()
             .await?
             .json()
@@ -156,6 +157,21 @@ mod tests {
                 .await
                 .unwrap();
             assert!(!translated.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_baidu_translate_custom_dict() {
+        if let (Some(app_id), Some(app_secret)) = (
+            option_env!("TEST_BAIDU_APP_ID"),
+            option_env!("TEST_BAIDU_APP_SECRET"),
+        ) {
+            let translator = BaiduTranslator::new(app_id.parse().unwrap(), app_secret.to_string());
+            let translated = translator
+                .translate_text("Hoshimachi Suisei is a Japanese virtual YouTuber. She began posting videos as an independent creator in March 2018.")
+                .await
+                .unwrap();
+            assert!(translated.contains("星街彗星"));
         }
     }
 }
