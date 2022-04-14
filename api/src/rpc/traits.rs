@@ -16,8 +16,11 @@ pub trait Response: Sized {
         self.status().is_success()
     }
 
-    fn packed(self) -> ResponseObject<Self> {
-        let success = self.is_successful();
-        ResponseObject::new(self, success)
+    fn packed(&self) -> ResponseObject<&Self> {
+        ResponseObject::new(self)
+    }
+
+    fn into_packed(self) -> ResponseObject<Self> {
+        ResponseObject::new(self)
     }
 }

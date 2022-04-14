@@ -93,8 +93,8 @@ impl Context {
     /// # Errors
     /// Fails when encoding failed. This is unlikely to happen, but if it does, it's a bug.
     pub fn encode(&self, user_id: &Uuid, privilege: Privilege) -> ApiResult<(String, Claims)> {
-        self.jwt.encode(user_id, privilege).map_err(|e| {
-            tracing::error!(e = ?e, "Failed to encode JWT token");
+        self.jwt.encode(user_id, privilege).map_err(|detail| {
+            tracing::error!(?detail, "Failed to encode JWT token");
             ApiError::internal()
         })
     }

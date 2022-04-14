@@ -12,43 +12,18 @@ use crate::{rpc::ApiError, timestamp, Response};
 #[must_use]
 pub struct ResponseObject<T> {
     pub data: T,
-    pub success: bool,
     pub time: String,
 }
 
 impl<T> ResponseObject<T> {
     #[inline]
-    pub fn new(data: T, success: bool) -> Self {
-        Self::with_time(data, success, timestamp())
+    pub fn new(data: T) -> Self {
+        Self::new_with_time(data, timestamp())
     }
 
     #[inline]
-    pub const fn with_time(data: T, success: bool, time: String) -> Self {
-        Self {
-            data,
-            success,
-            time,
-        }
-    }
-
-    #[inline]
-    pub fn success(data: T) -> Self {
-        Self::new(data, true)
-    }
-
-    #[inline]
-    pub fn error(data: T) -> Self {
-        Self::new(data, false)
-    }
-
-    #[inline]
-    pub const fn is_success(&self) -> bool {
-        self.success
-    }
-
-    #[inline]
-    pub const fn is_error(&self) -> bool {
-        !self.success
+    pub const fn new_with_time(data: T, time: String) -> Self {
+        Self { data, time }
     }
 }
 
@@ -65,9 +40,20 @@ impl<T: Serialize> ResponseObject<T> {
     pub fn to_json(&self) -> String {
         match serde_json::to_string(&self) {
             Ok(res) => res,
-            Err(err) => {
-                tracing::error!("Failed to serialize response object: {}", err);
+            Err(detail) => {
+                tracing::error!("Failed to serialize response object: {}", detail);
                 ApiError::internal().packed().to_json()
+            }
+        }
+    }
+
+    #[inline]
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        match serde_json::to_vec(&self) {
+            Ok(res) => res,
+            Err(detail) => {
+                tracing::error!("Failed to serialize response object: {}", detail);
+                ApiError::internal().packed().to_json_bytes()
             }
         }
     }

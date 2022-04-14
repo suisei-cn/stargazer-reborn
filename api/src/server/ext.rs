@@ -1,16 +1,16 @@
 use crate::{
-    rpc::{ApiError, ApiResult, Request, Response, ResponseObject},
+    rpc::{ApiError, ApiResult, Request, Response},
     server::Context,
 };
 
 use axum::{
-    body::Body,
+    body::{self, Body, Full},
     extract::{Extension, Json},
-    response::{IntoResponse, Response as AxumResponse},
+    response::Response as AxumResponse,
     routing::{post, Router},
 };
 use futures::Future;
-use http::StatusCode;
+use http::{header, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Marker trait to ensure handlers are in a good shape.
@@ -49,18 +49,12 @@ impl RouterExt for Router<Body> {
     {
         let handler = move |Json(req): Json<R>, Extension(ctx): Extension<Context>| async {
             match method.invoke(ctx, req).await {
-                Ok(res) => res.packed().into_response(),
-                Err(e) => e.packed().into_response(),
+                Ok(res) => res.as_response(),
+                Err(e) => e.as_response(),
             }
         };
 
         self.route(&("/".to_owned() + R::METHOD), post(handler))
-    }
-}
-
-impl axum::response::IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
-        self.packed().into_response()
     }
 }
 
@@ -72,9 +66,8 @@ impl From<jsonwebtoken::errors::Error> for ApiError {
 }
 
 impl From<mongodb::error::Error> for ApiError {
-    fn from(err: mongodb::error::Error) -> Self {
-        let err_str = err.to_string();
-        tracing::error!(error = err_str.as_str(), "Mongo error");
+    fn from(detail: mongodb::error::Error) -> Self {
+        tracing::error!(?detail, "Mongo error");
         Self::internal()
     }
 }
@@ -85,31 +78,31 @@ impl From<sg_auth::Error> for ApiError {
 
         match err {
             Mongo(e) => e.into(),
-            Argon(e) => {
-                tracing::error!(e = ?e, "Argon error");
+            Argon(detail) => {
+                tracing::error!(?detail, "Argon error");
                 Self::internal()
             }
-            Bson(e) => {
-                tracing::error!(e = ?e, "Bson error");
+            Bson(detail) => {
+                tracing::error!(?detail, "Bson error");
                 Self::internal()
             }
         }
     }
 }
 
-impl<R: Response> axum::response::IntoResponse for ResponseObject<R>
-where
-    R: Serialize,
-{
-    fn into_response(self) -> AxumResponse {
-        let status = if self.success {
-            StatusCode::OK
-        } else {
-            StatusCode::BAD_REQUEST
-        };
+pub trait ResponseExt: Response + Serialize {
+    fn as_response(&self) -> AxumResponse;
+}
 
-        let mut body = Json(self).into_response();
-        *body.status_mut() = status;
-        body
+impl<R: Response + Serialize> ResponseExt for R {
+    fn as_response(&self) -> AxumResponse {
+        AxumResponse::builder()
+            .status(self.status())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )
+            .body(body::boxed(Full::from(self.packed().to_json_bytes())))
+            .expect("Status and header should be statically known and not having any parsing issue")
     }
 }

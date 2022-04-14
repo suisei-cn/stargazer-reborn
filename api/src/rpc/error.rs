@@ -7,7 +7,7 @@ use http::StatusCode;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::rpc::{Response, ResponseObject};
+use crate::rpc::Response;
 
 #[cfg_attr(
     feature = "server",
@@ -89,15 +89,6 @@ impl ApiError {
     {
         self.error.extend(error.into_iter().map(Into::into));
         self
-    }
-
-    #[must_use]
-    pub const fn status(&self) -> StatusCode {
-        self.status
-    }
-
-    pub fn packed(self) -> ResponseObject<Self> {
-        ResponseObject::error(self)
     }
 
     pub fn bad_token() -> Self {

@@ -7,7 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use axum::{body::BoxBody, http::Request, response::IntoResponse};
+use axum::{body::BoxBody, http::Request};
 use jsonwebtoken::{
     errors::Result as JwtResult, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
@@ -17,7 +17,7 @@ use tower_http::auth::{AuthorizeRequest, RequireAuthorizationLayer};
 
 use crate::{
     rpc::ApiError,
-    server::{Config, Context},
+    server::{Config, Context, ResponseExt},
 };
 
 /// Privilege of a token. Three levels: User, Bot, Admin.
@@ -177,28 +177,28 @@ where
         let token = request
             .headers()
             .get(http::header::AUTHORIZATION)
-            .ok_or_else(|| ApiError::missing_token().into_response())?
+            .ok_or_else(|| ApiError::missing_token().as_response())?
             .to_str()
             .map_err(|_| {
-                ApiError::bad_request("Invalid header authentication encoding").into_response()
+                ApiError::bad_request("Invalid header authentication encoding").as_response()
             })?
             .strip_prefix("Bearer ")
             .ok_or_else(|| {
                 ApiError::bad_request(
                     "Invalid authentication header, this should be in bearer token format",
                 )
-                .into_response()
+                .as_response()
             })?;
 
         let claims = self
             .jwt
             .validate(token)
-            .map_err(|_| ApiError::bad_token().into_response())?;
+            .map_err(|_| ApiError::bad_token().as_response())?;
 
         tracing::debug!(privilege = ?claims.prv, guard = ?self.guard);
 
         if self.guard > claims.prv {
-            return Err(ApiError::unauthorized().into_response());
+            return Err(ApiError::unauthorized().as_response());
         }
 
         let _ = request

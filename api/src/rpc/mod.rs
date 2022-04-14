@@ -272,7 +272,7 @@ mod test_macro {
             user_id: "foo".to_string(),
             user_info: "bar".to_string(),
         }
-        .packed();
+        .into_packed();
         resp_obj.time = now;
 
         assert_eq!(resp, resp_obj.to_json());
@@ -286,7 +286,8 @@ mod test_macro {
             r#"{{"data":{{"error":["Not Found","Cannot find user with ID `{id}`"]}},"success":false,"time":"{now}"}}"#,
         );
 
-        let mut resp_obj = ApiError::user_not_found_with_id(&Uuid::parse_str(id).unwrap()).packed();
+        let mut resp_obj =
+            ApiError::user_not_found_with_id(&Uuid::parse_str(id).unwrap()).into_packed();
         resp_obj.time = now;
 
         assert_eq!(resp, resp_obj.to_json());
