@@ -46,7 +46,7 @@ pub async fn make_app(config: Config) -> Result<Router> {
 
     let ctx = Context::new(jwt, config).await?;
 
-    let app = Router::new()
+    let api = Router::new()
         .mount(add_user)
         .mount(add_entity)
         .mount(add_task)
@@ -67,7 +67,7 @@ pub async fn make_app(config: Config) -> Result<Router> {
         .layer(cors_layer)
         .layer(trace_layer);
 
-    Ok(app)
+    Ok(Router::new().nest("/v1", api))
 }
 
 async fn health(_: Health, _: Context) -> ApiResult<Null> {

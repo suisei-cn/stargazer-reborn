@@ -54,7 +54,7 @@ impl RouterExt for Router<Body> {
             }
         };
 
-        self.route(&("/v1/".to_owned() + R::METHOD), post(handler))
+        self.route(&("/".to_owned() + R::METHOD), post(handler))
     }
 }
 
