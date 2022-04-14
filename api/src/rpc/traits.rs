@@ -17,10 +17,11 @@ pub trait Response: Sized {
     }
 
     fn packed(&self) -> ResponseObject<&Self> {
-        ResponseObject::new(self)
+        ResponseObject::new(self, self.is_successful())
     }
 
     fn into_packed(self) -> ResponseObject<Self> {
-        ResponseObject::new(self)
+        let success = self.is_successful();
+        ResponseObject::new(self, success)
     }
 }

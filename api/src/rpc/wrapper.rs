@@ -12,18 +12,23 @@ use crate::{rpc::ApiError, timestamp, Response};
 #[must_use]
 pub struct ResponseObject<T> {
     pub data: T,
+    pub success: bool,
     pub time: String,
 }
 
 impl<T> ResponseObject<T> {
     #[inline]
-    pub fn new(data: T) -> Self {
-        Self::new_with_time(data, timestamp())
+    pub fn new(data: T, success: bool) -> Self {
+        Self::new_with_time(data, timestamp(), success)
     }
 
     #[inline]
-    pub const fn new_with_time(data: T, time: String) -> Self {
-        Self { data, time }
+    pub const fn new_with_time(data: T, time: String, success: bool) -> Self {
+        Self {
+            data,
+            success,
+            time,
+        }
     }
 }
 
