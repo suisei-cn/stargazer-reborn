@@ -31,6 +31,11 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      rmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
@@ -42,7 +47,9 @@ jobs:
         with:
           mongodb-replica-set: rs0
       - uses: actions-rs/cargo@v1
-        name: Running Tests 🚀
+        name: Prepare cargo-nextest 🛎️
         with:
-          command: test
-          args: --workspace
+          command: install
+          args: --locked cargo-nextest
+      - run: cargo nextest run -P ci
+        name: Running Tests 🚀

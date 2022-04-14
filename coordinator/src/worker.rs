@@ -183,7 +183,11 @@ impl WorkerGroupImpl {
             warn!(worker_id = %id, "Worker already exists in group. It might be crashed and rejoined the coordinator before a ping was sent.");
 
             // Unbind tasks on it.
-            self.tasks.retain(|_, task| task.worker != Some(id));
+            self.tasks.values_mut().for_each(|task| {
+                if task.worker == Some(id) {
+                    task.worker = None;
+                }
+            });
         } else {
             // Add the worker to the ring.
             self.ring.insert(id);

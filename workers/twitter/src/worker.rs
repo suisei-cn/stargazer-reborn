@@ -30,7 +30,7 @@ use crate::Config;
 #[derive(Clone)]
 pub struct TwitterWorker {
     token: Arc<Token>,
-    mq: Arc<MessageQueue>,
+    mq: Arc<dyn MessageQueue>,
     interval: Duration,
 
     #[allow(clippy::type_complexity)]
@@ -40,7 +40,7 @@ pub struct TwitterWorker {
 impl TwitterWorker {
     /// Creates a new worker.
     #[must_use]
-    pub fn new(config: Config, mq: MessageQueue) -> Self {
+    pub fn new(config: Config, mq: impl MessageQueue + 'static) -> Self {
         Self {
             token: Arc::new(Token::Bearer(config.twitter_token)),
             mq: Arc::new(mq),
@@ -132,7 +132,7 @@ async fn twitter_task(
     user_id: UserID,
     token: &Token,
     entity_id: Uuid,
-    mq: &MessageQueue,
+    mq: impl MessageQueue,
     poll_interval: Duration,
 ) -> Result<()> {
     let mut ticker = interval(poll_interval);
@@ -144,10 +144,10 @@ async fn twitter_task(
         for raw_tweet in resp?.response {
             let tweet_id = raw_tweet.id;
             let tweet = Tweet::from(raw_tweet);
-            let event = Event::from_serializable("twitter", entity_id.into(), tweet)?;
+            let event = Event::from_serializable("twitter", entity_id, tweet)?;
 
             // Send tweet to message queue.
-            if let Err(error) = mq.publish(event).await {
+            if let Err(error) = mq.publish(event, "translate".parse().unwrap()).await {
                 error!(?error, %tweet_id, "Failed to publish tweet");
             }
         }

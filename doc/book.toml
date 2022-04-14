@@ -1,0 +1,6 @@
+[book]
+authors = ["George Miao"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Stargazer Reborn"
