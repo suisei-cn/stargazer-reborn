@@ -28,7 +28,7 @@ tokio-stream = { version = "0.1", features = ["sync"], optional = true }
 tokio-tungstenite = "0.17"
 tracing = "0.1"
 url = { version = "2.2.2", features = ["serde"] }
-uuid = "0.8"
+uuid = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1.17", features = ["rt", "time", "net", "sync"] }
