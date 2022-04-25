@@ -19,7 +19,7 @@ mongodb = { version = "2.2.1", features = ["bson-uuid-0_8"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tap = "1.0"
-tarpc = { version = "0.27", features = ["serde1", "tokio1"] }
+tarpc = { version = "0.28", features = ["serde1", "tokio1"] }
 thiserror = "1.0"
 tokio = { version = "1.17", features = ["rt"] }
 tokio-executor-trait = { version = "2.1", optional = true }
