@@ -11,7 +11,7 @@ eyre = "0.6"
 figment = { version = "0.10", features = ["env"] }
 futures-util = { version = "0.3", features = ["sink"] }
 humantime-serde = "1.0"
-mongodb = { version = "2.2.0", features = ["bson-uuid-0_8"] }
+mongodb = { version = "2.2.1", features = ["bson-uuid-0_8"] }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 sg-core = { package = "core", path = "../core" }
