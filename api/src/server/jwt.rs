@@ -143,7 +143,7 @@ impl Debug for JWTContext {
 }
 
 /// A guard that can be used with [`tower_http::auth::RequireAuthorizationLayer`]
-/// to garante the user is authorized and authenticated.
+/// to guarantee the user is authorized and authenticated.
 /// ( Privilege must be greater than `guard` )
 #[derive(Clone)]
 pub struct JWTGuard {
