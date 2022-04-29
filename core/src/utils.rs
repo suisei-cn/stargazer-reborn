@@ -28,6 +28,19 @@ impl<T> Drop for ScopedJoinHandle<T> {
     }
 }
 
+/// A macro to quickly create a single `kv` [`map`].
+///
+/// [`map`]: serde_json::Map
+macro_rules! map {
+    ($k: expr, $v: expr) => {{
+        let mut map = serde_json::Map::new();
+        map.insert($k.into(), Value::String($v.into()));
+        map
+    }};
+}
+
+pub(crate) use map;
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
