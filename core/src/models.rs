@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use url::Url;
 
+use crate::utils::map;
+
 /// Entity for a vtuber.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entity {
@@ -59,6 +61,51 @@ pub struct Task {
     pub kind: String,
     /// Parameters of the task.
     pub params: Map<String, Value>,
+}
+
+impl Task {
+    /// Create a new youtube task with `channel_id` and `parent`,
+    ///
+    /// # Params
+    /// - `channel_id` is the channel id of the youtube channel.
+    /// - `parent` is the `Uuid` of entity the task belongs to.
+    pub fn new_youtube(channel_id: impl Into<String>, parent: Uuid) -> Self {
+        let channel_id = channel_id.into();
+        Self {
+            id: Uuid::new(),
+            entity: parent,
+            kind: "youtube".to_string(),
+            params: map!("channel_id", channel_id),
+        }
+    }
+
+    /// Create a new bilibili task with `uid` and `parent`,
+    ///
+    /// # Params
+    /// - `uid` is the uid of the bilibili account.
+    /// - `parent` is the `Uuid` of entity the task belongs to.
+    pub fn new_bilibili(uid: impl Into<String>, parent: Uuid) -> Self {
+        Self {
+            id: Uuid::new(),
+            entity: parent,
+            kind: "bililive".to_string(),
+            params: map!("uid", uid),
+        }
+    }
+
+    /// Create a new twitter task with `id` and `parent`,
+    ///
+    /// # Params
+    /// - `id` is the id of the twitter account.
+    /// - `parent` is the `Uuid` of entity the task belongs to.
+    pub fn new_twitter(id: impl Into<String>, parent: Uuid) -> Self {
+        Self {
+            id: Uuid::new(),
+            entity: parent,
+            kind: "twitter".to_string(),
+            params: map!("id", id),
+        }
+    }
 }
 
 /// Event pushed by workers (or addons) to the message queue and received by IM agents.
