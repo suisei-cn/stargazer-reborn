@@ -131,7 +131,7 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or user not found
-    pub async fn find_user(&self, query: &UserQuery) -> Result<User, ApiError> {
+    pub async fn find_user(&self, query: &UserQuery) -> ApiResult<User> {
         self.users()
             .find_one(query.as_document(), None)
             .await?
@@ -140,7 +140,7 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or user not found
-    pub async fn del_user(&self, query: &UserQuery) -> Result<User, ApiError> {
+    pub async fn del_user(&self, query: &UserQuery) -> ApiResult<User> {
         self.users()
             .find_one_and_delete(query.as_document(), None)
             .await?
@@ -149,7 +149,7 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or user not found
-    pub async fn update_user(&self, query: &UserQuery, update: Document) -> Result<User, ApiError> {
+    pub async fn update_user(&self, query: &UserQuery, update: Document) -> ApiResult<User> {
         self.users()
             .find_one_and_update(
                 query.as_document(),
@@ -164,7 +164,7 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or entity not found
-    pub async fn find_entity(&self, id: &Uuid) -> Result<Entity, ApiError> {
+    pub async fn find_entity(&self, id: &Uuid) -> ApiResult<Entity> {
         self.entities()
             .find_one(doc! { "id": id }, None)
             .await?

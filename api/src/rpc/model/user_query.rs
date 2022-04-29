@@ -31,6 +31,30 @@ impl UserQuery {
     }
 }
 
+impl From<&UserQuery> for Document {
+    fn from(user_query: &UserQuery) -> Self {
+        user_query.as_document()
+    }
+}
+
+impl From<UserQuery> for Document {
+    fn from(user_query: UserQuery) -> Self {
+        user_query.as_document()
+    }
+}
+
+impl From<&UserQuery> for ApiError {
+    fn from(user_query: &UserQuery) -> Self {
+        user_query.as_error()
+    }
+}
+
+impl From<UserQuery> for ApiError {
+    fn from(user_query: UserQuery) -> Self {
+        user_query.as_error()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use mongodb::bson::Uuid;
