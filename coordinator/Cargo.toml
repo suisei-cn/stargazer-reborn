@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 sg-core = { package = "core", path = "../core" }
 tap = "1.0"
 tarpc = { version = "0.28", features = ["serde1", "tokio1"] }
-tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
+tokio = { version = "1.18", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
 tokio-tungstenite = "0.17"
 tracing = "0.1"
 tracing-subscriber = "0.3"
