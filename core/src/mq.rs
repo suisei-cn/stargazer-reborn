@@ -1,10 +1,10 @@
 //! Message queue for workers.
 
-use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::pin::Pin;
 use std::str::FromStr;
+use std::{convert::Infallible, ops::DerefMut};
 use std::{iter, vec};
 
 use async_trait::async_trait;
@@ -216,6 +216,20 @@ impl IntoIterator for Middlewares {
 
     fn into_iter(self) -> Self::IntoIter {
         self.middlewares.into_iter()
+    }
+}
+
+impl Deref for Middlewares {
+    type Target = [String];
+
+    fn deref(&self) -> &[String] {
+        &self.middlewares
+    }
+}
+
+impl DerefMut for Middlewares {
+    fn deref_mut(&mut self) -> &mut [String] {
+        &mut self.middlewares
     }
 }
 
