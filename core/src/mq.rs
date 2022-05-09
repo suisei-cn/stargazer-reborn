@@ -1,10 +1,10 @@
 //! Message queue for workers.
 
+use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::str::FromStr;
-use std::{convert::Infallible, ops::DerefMut};
 use std::{iter, vec};
 
 use async_trait::async_trait;
