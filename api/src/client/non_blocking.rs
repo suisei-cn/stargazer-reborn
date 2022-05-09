@@ -22,9 +22,19 @@ impl Client {
     /// # Errors
     /// Fails on invalid URL.
     pub fn new(url: impl IntoUrl) -> Result<Self> {
+        Self::with_client(reqwest::Client::new(), url)
+    }
+
+    /// Creates new client instance with given reqwest client.
+    ///
+    /// Note that URL should comes with api version in path and a trailing slash.
+    ///
+    /// # Errors
+    /// Fails on invalid URL.
+    pub fn with_client(client: reqwest::Client, url: impl IntoUrl) -> Result<Self> {
         Ok(Self {
-            client: reqwest::Client::new(),
             token: None,
+            client,
             url: url.into_url()?,
         })
     }
