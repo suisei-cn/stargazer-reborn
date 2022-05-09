@@ -94,6 +94,17 @@ crate::methods! {
         query: UserQuery,
     } -> User,
 
+    /// Query users that subscribed to specific events. This
+    /// is filtered by the user's event filter and im.
+    get_interest := GetInterest {
+        entity_id: Uuid,
+        kind: String,
+        im: String
+    } -> Interest {
+        /// List of users that interest in the event
+        users: Vec<User>
+    },
+
     // ------------ //
     // Admin method //
     // ------------ //

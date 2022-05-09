@@ -180,7 +180,7 @@ where
             .ok_or_else(|| ApiError::missing_token().as_response())?
             .to_str()
             .map_err(|_| {
-                ApiError::bad_request("Invalid header authentication encoding").as_response()
+                ApiError::bad_request("Invalid authentication header encoding").as_response()
             })?
             .strip_prefix("Bearer ")
             .ok_or_else(|| {

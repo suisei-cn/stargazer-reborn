@@ -3,7 +3,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
-    model::{Health, Login, Null, UserQuery},
+    model::{GetInterest, Health, Interest, Login, Null, UserQuery},
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
@@ -54,6 +54,7 @@ pub async fn make_app(config: Config) -> Result<Router> {
         .mount(del_task)
         .mount(update_entity)
         .layer(admin_guard)
+        .mount(get_interest)
         .mount(get_entities)
         .mount(new_token)
         .mount(del_user)
@@ -225,6 +226,30 @@ async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
     .await?;
 
     Ok(Entities { vtbs, groups })
+}
+
+async fn get_interest(req: GetInterest, ctx: Context) -> ApiResult<Interest> {
+    let GetInterest {
+        entity_id,
+        kind,
+        im,
+    } = req;
+
+    let users = ctx
+        .users()
+        .find(
+            doc! {
+              "event_filter.entities": entity_id,
+              "event_filter.kinds": kind,
+              "im": im,
+            },
+            None,
+        )
+        .await?
+        .try_collect()
+        .await?;
+
+    Ok(Interest { users })
 }
 
 async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {

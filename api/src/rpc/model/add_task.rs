@@ -2,8 +2,6 @@ use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 use sg_core::models::Task;
 
-use crate::TaskExt;
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "lowercase")]
