@@ -21,7 +21,7 @@ serde_json = "1.0"
 tap = "1.0"
 tarpc = { version = "0.28", features = ["serde1", "tokio1"] }
 thiserror = "1.0"
-tokio = { version = "1.17", features = ["rt"] }
+tokio = { version = "1.18", features = ["rt"] }
 tokio-executor-trait = { version = "2.1", optional = true }
 tokio-reactor-trait = { version = "1.1", optional = true }
 tokio-stream = { version = "0.1", features = ["sync"], optional = true }
@@ -31,5 +31,5 @@ url = { version = "2.2.2", features = ["serde"] }
 uuid = "0.8"
 
 [dev-dependencies]
-tokio = { version = "1.17", features = ["rt", "time", "net", "sync"] }
+tokio = { version = "1.18", features = ["rt", "time", "net", "sync"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
