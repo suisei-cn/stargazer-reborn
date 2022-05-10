@@ -172,7 +172,7 @@ pub struct User {
     /// Display name of the user.
     pub name: String,
     /// Avatar of the user.
-    pub avatar: Url,
+    pub avatar: Option<Url>,
     /// The events that the user is subscribed to.
     pub event_filter: EventFilter,
 }
