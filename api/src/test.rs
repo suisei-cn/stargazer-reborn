@@ -107,7 +107,10 @@ fn test_new_user() {
 
     assert_eq!(im, "tg");
     assert_eq!(name, "Pop");
-    assert_eq!(avatar.as_str(), "http://placekitten.com/114/514");
+    assert_eq!(
+        avatar.as_ref().map(Url::as_str).unwrap(),
+        "http://placekitten.com/114/514"
+    );
     assert_eq!(
         event_filter,
         &EventFilter {

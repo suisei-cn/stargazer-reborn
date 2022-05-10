@@ -92,7 +92,7 @@ fn gen_user(event_filter: EventFilter) -> User {
         id: id.into(),
         name: FakeName().fake(),
         event_filter,
-        avatar: "http://placekitten.com/114/514".parse().unwrap(),
+        avatar: "http://placekitten.com/114/514".parse().ok(),
         im: ["tg", "qq"].choose(&mut rng).unwrap().to_owned().to_owned(),
         im_payload: Faker.fake(),
     }
