@@ -82,7 +82,7 @@ crate::methods! {
         /// IM payload, e.g. Chat id in telegram
         im_payload: String,
         /// Avatar of the user.
-        avatar: Url,
+        avatar: Option<Url>,
         /// Name of the user.
         name: String
     } -> User,

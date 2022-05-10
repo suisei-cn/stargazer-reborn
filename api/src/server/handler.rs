@@ -257,7 +257,6 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
         im,
         im_payload,
         avatar,
-
         name,
     } = req;
 
