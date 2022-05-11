@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
 use color_eyre::{eyre::Context, Result};
 use futures::{stream::FuturesUnordered, StreamExt};
@@ -9,7 +9,7 @@ use sg_core::{
     mq::{MessageQueue, RabbitMQ},
 };
 use teloxide::{
-    adaptors::{AutoSend, DefaultParseMode},
+    adaptors::DefaultParseMode,
     prelude::*,
     types::{ChatId, ParseMode, Recipient},
     Bot as TeloxideBot,
@@ -19,10 +19,10 @@ use tracing::{debug, error, info};
 
 use crate::{answer, config::Config, Command};
 
-type Bot = AutoSend<DefaultParseMode<TeloxideBot>>;
+pub type Bot = DefaultParseMode<TeloxideBot>;
 
-static BOT: OnceCell<Bot> = OnceCell::new();
-static CLIENT: OnceCell<Client> = OnceCell::new();
+pub static BOT: OnceCell<Bot> = OnceCell::new();
+pub static CLIENT: OnceCell<Client> = OnceCell::new();
 
 /// Start the service.
 ///
@@ -33,6 +33,9 @@ pub async fn start() -> Result<()> {
     init(&config).await?;
 
     select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received SIGINT, exiting...");
+        }
         res = start_bot() => {
             error!("Bot quit");
             res?;
@@ -48,9 +51,8 @@ pub async fn start() -> Result<()> {
 async fn init(config: &Config) -> Result<()> {
     let reqwest_client = reqwest::Client::new();
     let bot = TeloxideBot::with_client(&config.bot_token, reqwest_client.clone())
-        .parse_mode(ParseMode::Html)
-        .auto_send();
-    let me = bot.get_me().await?;
+        .parse_mode(ParseMode::Html);
+    let me = bot.get_me().send().await?;
     info!(username = %me.username(), "Telegram Bot API logged in");
     BOT.set(bot).expect("Bot is already initialized");
 
@@ -58,6 +60,7 @@ async fn init(config: &Config) -> Result<()> {
     client
         .login_and_store(&config.api_username, &config.api_password)
         .await?;
+    info!(username = %config.api_username, "API logged in");
     CLIENT.set(client).expect("Client is already initialized");
 
     Ok(())
@@ -110,7 +113,10 @@ async fn handle_event(event: Event) -> Result<()> {
         .into_iter()
         .map(|user| async move {
             let cid: i64 = user.im_payload.parse().wrap_err("Bad chat id")?;
-            let res = bot.send_message(Recipient::Id(ChatId(cid)), text).await?;
+            let res = bot
+                .send_message(Recipient::Id(ChatId(cid)), text)
+                .send()
+                .await?;
             debug!(chat = %res.chat.id, id = res.id, "Message sent");
             Result::<_>::Ok(())
         })
@@ -123,4 +129,25 @@ async fn handle_event(event: Event) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[tokio::test]
+async fn test_bot() {
+    use tracing::level_filters::LevelFilter;
+
+    let level = std::env::var("TG_LOG");
+    let level = level.as_deref().unwrap_or("info");
+
+    dotenv::dotenv().unwrap();
+    color_eyre::install().unwrap();
+    tracing_subscriber::fmt()
+        .with_max_level(level.parse::<LevelFilter>().unwrap())
+        .init();
+
+    tokio::spawn(sg_api::server::serve());
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    let config = Config::from_env().unwrap();
+    init(&config).await.unwrap();
+    start_bot().await.unwrap();
 }

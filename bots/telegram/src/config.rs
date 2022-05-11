@@ -40,7 +40,7 @@ impl Default for Config {
         Self {
             amqp_url: String::from("amqp://guest:guest@localhost:5672"),
             amqp_exchange: String::from("stargazer-reborn"),
-            api_url: Url::parse("http://localhost:8080").unwrap(),
+            api_url: Url::parse("http://127.0.0.1:8000/v1/").unwrap(),
             api_username: String::from(""),
             api_password: String::from(""),
             bot_token: String::from(""),
@@ -68,7 +68,7 @@ mod tests {
         Jail::expect_with(|jail| {
             jail.set_env("TG_AMQP_URL", "amqp://admin:admin@localhost:5672");
             jail.set_env("TG_AMQP_EXCHANGE", "some_exchange");
-            jail.set_env("TG_API_URL", "http://localhost:8080");
+            jail.set_env("TG_API_URL", "http://localhost:8000");
             jail.set_env("TG_API_USERNAME", "admin");
             jail.set_env("TG_API_PASSWORD", "admin");
             jail.set_env("TG_BOT_TOKEN", "some_token");
