@@ -12,4 +12,31 @@ pub enum Error {
     Api(#[from] crate::rpc::ApiError),
 }
 
+impl Error {
+    #[must_use]
+    pub const fn is_api(&self) -> bool {
+        matches!(self, Error::Api(_))
+    }
+
+    #[must_use]
+    pub const fn as_api(&self) -> Option<&crate::rpc::ApiError> {
+        if let Error::Api(api_error) = self {
+            Some(api_error)
+        } else {
+            None
+        }
+    }
+
+    // Allow b/c destructor cannot be evaluated at compile time
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_api(self) -> Option<crate::rpc::ApiError> {
+        if let Error::Api(api_error) = self {
+            Some(api_error)
+        } else {
+            None
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
