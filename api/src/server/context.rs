@@ -24,7 +24,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Context {
     /// Config.
-    pub(crate) config: Arc<Config>,
+    config: Arc<Config>,
     /// JWT
     jwt: Arc<JWTContext>,
     /// DB instance. Since DB is composed of [`Collection`](mongodb::Collection)s, cloning is cheap.
@@ -45,6 +45,11 @@ impl Context {
         let db = client.database(&config.mongo_db);
 
         Ok(Self::new_with_db(db, jwt, config))
+    }
+
+    #[must_use]
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Construct self with preconnected database.
