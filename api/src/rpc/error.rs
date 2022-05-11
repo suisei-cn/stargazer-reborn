@@ -32,32 +32,72 @@ assert_eq!(resp, resp_obj.to_json());
 #[must_use]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
-    pub error: Vec<String>,
+    error: Vec<String>,
     #[serde(skip)]
     status: StatusCode,
 }
 
 impl Display for ApiError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Api Error: ")?;
-        write!(f, "[Status {}]", self.status.as_str())?;
+        write!(f, "Api Error")?;
+        write!(f, "({})", self.status.as_str())?;
 
-        self.error
-            .iter()
-            .map(String::as_str)
-            .try_for_each(|e| write!(f, " {},", e))
+        self.error.iter().try_for_each(|e| write!(f, " {},", e))
     }
 }
 
 impl StdError for ApiError {}
 
 impl ApiError {
+    #[inline]
     pub fn new(status: StatusCode) -> Self {
         let error = match status.canonical_reason() {
             Some(reason) => vec![reason.to_owned()],
             None => vec![],
         };
         Self { error, status }
+    }
+
+    #[must_use]
+    #[inline]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_errors(self) -> Vec<String> {
+        self.error
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn errors(&self) -> &[String] {
+        &self.error
+    }
+
+    /// Returns the canonical reason for error status.
+    ///
+    /// Returns `None` if the error is not a standard HTTP status.
+    #[inline]
+    #[must_use]
+    pub fn error_reason(&self) -> Option<&'static str> {
+        self.status.canonical_reason()
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn status(&self) -> StatusCode {
+        self.status
+    }
+
+    /// Match the text with the error reasons.
+    ///
+    /// Returns `true` if the text is a substring of any of the errors.
+    #[must_use]
+    pub fn matches(&self, status_text: &str) -> bool {
+        self.errors().iter().any(|e| e.contains(status_text))
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn matches_status(&self, status: StatusCode) -> bool {
+        self.status == status
     }
 
     /// Push an explanatory error message to the error list.

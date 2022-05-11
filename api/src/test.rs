@@ -139,7 +139,7 @@ fn test_new_user() {
         .unwrap_err();
     match err {
         crate::client::Error::Api(err) => {
-            assert_eq!(err.error[0].as_str(), "Conflict");
+            assert_eq!(err.error_reason(), Some("Conflict"));
         }
         _ => panic!("Unexpected error: {:?}", err),
     }
@@ -185,7 +185,7 @@ fn test_delete_nonexist_user() {
 
     match res {
         crate::client::Error::Api(e) => {
-            assert!(e.error[1].contains(&format!("Cannot find user with ID `{id}`")));
+            assert!(e.errors()[1].contains(&format!("Cannot find user with ID `{id}`")));
         }
         _ => panic!("Unexpected error: {:?}", res),
     }
