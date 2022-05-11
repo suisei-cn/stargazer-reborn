@@ -3,15 +3,15 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use mongodb::{
-    bson::{doc, Document, Uuid},
+    bson::{doc, to_document, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
     Client, Collection, Database,
 };
 use sg_auth::AuthClient;
-use sg_core::models::{Entity, Group, Task, User};
+use sg_core::models::{Entity, EventFilter, Group, Meta, Task, User};
 
 use crate::{
-    model::{Bot, UserQuery},
+    model::{AddTaskParam, Bot, UserQuery},
     rpc::{ApiError, ApiResult},
     server::{config::Config, Claims, JWTContext, Privilege},
 };
@@ -59,7 +59,7 @@ impl Context {
         }
     }
 
-    /// Get the claims from the JWT token header and assert its validity.
+    /// Get the claims from the JWT token header and assert its validity as an user. Admin and bots are not allowed.
     /// Only use this if trying to get user information from the token.
     ///
     /// # Errors
@@ -131,11 +131,11 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or user not found
-    pub async fn find_user(&self, query: &UserQuery) -> ApiResult<User> {
+    pub async fn find_user(&self, query: &UserQuery) -> ApiResult<Option<User>> {
         self.users()
             .find_one(query.as_document(), None)
-            .await?
-            .ok_or_else(|| query.as_error())
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
@@ -149,17 +149,92 @@ impl Context {
 
     /// # Errors
     /// Fail on database error or user not found
-    pub async fn update_user(&self, query: &UserQuery, update: Document) -> ApiResult<User> {
+    pub async fn update_setting(&self, id: &Uuid, event_filter: &EventFilter) -> ApiResult<User> {
+        let serialized = to_document(&event_filter)?;
+
         self.users()
             .find_one_and_update(
-                query.as_document(),
-                update,
+                doc! { "id": id },
+                doc! { "$set": { "event_filter": serialized } },
                 FindOneAndUpdateOptions::builder()
                     .return_document(ReturnDocument::After)
                     .build(),
             )
             .await?
-            .ok_or_else(|| query.as_error())
+            .ok_or_else(|| ApiError::user_not_found_with_id(id))
+    }
+
+    /// # Errors
+    /// Fail on database error, entity not found or failed to serialize meta
+    pub async fn update_entity(&self, id: &Uuid, meta: &Meta) -> ApiResult<Entity> {
+        self.entities()
+            .find_one_and_update(
+                doc! { "id": id },
+                doc! { "meta": to_document(meta)? },
+                FindOneAndUpdateOptions::builder()
+                    .return_document(ReturnDocument::After)
+                    .build(),
+            )
+            .await?
+            .ok_or_else(|| ApiError::entity_not_found(id))
+    }
+
+    /// # Errors
+    /// Fail on database error or task not found
+    pub async fn add_task(&self, entity_id: &Uuid, task: Task) -> ApiResult<Task> {
+        if self
+            .entities()
+            .update_one(
+                doc! { "id": entity_id },
+                doc! { "$push": { "tasks": task.id } },
+                None,
+            )
+            .await?
+            .modified_count
+            == 0
+        {
+            Err(ApiError::entity_not_found(entity_id))
+        } else {
+            self.tasks().insert_one(&task, None).await?;
+            Ok(task)
+        }
+    }
+
+    /// # Errors
+    /// Fail on database error
+    pub async fn add_tasks(
+        &self,
+        entity_id: &Uuid,
+        tasks: impl Iterator<Item = AddTaskParam> + Send,
+    ) -> ApiResult<Vec<Task>> {
+        let tasks = tasks
+            .map(|x| x.into_task_with(*entity_id))
+            .collect::<Vec<_>>();
+
+        self.tasks().insert_many(&tasks, None).await?;
+        Ok(tasks)
+    }
+
+    /// # Errors
+    /// Fail on database error or task not found
+    pub async fn del_task(&self, task_id: &Uuid) -> ApiResult<Task> {
+        // Make sure this exists
+        let task = self
+            .tasks()
+            .find_one_and_delete(doc! { "id": task_id }, None)
+            .await?
+            .ok_or_else(|| ApiError::task_not_found(task_id))?;
+
+        // Delete the task from the entity that holds it
+        self.entities()
+            .update_one(
+                doc! { "id": task.entity },
+                doc! { "tasks": { "$pull": task_id } },
+                None,
+            )
+            .await?;
+
+        Ok(task)
     }
 
     /// # Errors
@@ -176,7 +251,7 @@ impl Context {
     ///
     /// An uuid is "nil" if all bytes are set to 0, which at here represents that
     /// the token is issued to an admin or bot, who does not represent a subscriber.
-    pub async fn find_and_assert_claim(&self) -> ApiResult<User> {
+    pub async fn find_and_assert_claim(&self) -> ApiResult<Option<User>> {
         let user_id = self.assert_user_claims()?.id();
         if user_id.bytes() == [0; 16] {
             return Err(ApiError::unauthorized());

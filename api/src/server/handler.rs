@@ -19,7 +19,7 @@ use color_eyre::Result;
 use futures::{future::try_join, TryStreamExt};
 use http::Method;
 use mongodb::{
-    bson::{doc, to_bson, Uuid},
+    bson::{doc, to_document, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
 };
 use sg_auth::{Permission, PermissionSet};
@@ -107,33 +107,20 @@ async fn add_entity(req: AddEntity, ctx: Context) -> ApiResult<Entity> {
 
     ctx.entities().insert_one(&ent, None).await?;
 
-    let tasks = tasks
+    ent.tasks = ctx
+        .add_tasks(&ent.id, tasks.into_iter())
+        .await?
         .into_iter()
-        .map(|x| x.into_task_with(ent.id))
-        .collect::<Vec<_>>();
-
-    ctx.tasks().insert_many(&tasks, None).await?;
-
-    ent.tasks = tasks.into_iter().map(|x| x.id).collect();
+        .map(|x| x.id)
+        .collect();
 
     Ok(ent)
 }
 
 async fn update_entity(req: UpdateEntity, ctx: Context) -> ApiResult<Entity> {
-    let UpdateEntity { entity_id, meta } = req;
+    let UpdateEntity { entity_id, meta } = &req;
 
-    let ser = to_bson(&meta).map_err(|_| ApiError::bad_request("Invalid meta"))?;
-
-    ctx.entities()
-        .find_one_and_update(
-            doc! { "id": entity_id },
-            doc! { "meta": ser },
-            FindOneAndUpdateOptions::builder()
-                .return_document(ReturnDocument::After)
-                .build(),
-        )
-        .await?
-        .ok_or_else(|| ApiError::entity_not_found(&entity_id))
+    ctx.update_entity(entity_id, meta).await
 }
 
 async fn del_entity(req: DelEntity, ctx: Context) -> ApiResult<Entity> {
@@ -156,66 +143,22 @@ async fn del_entity(req: DelEntity, ctx: Context) -> ApiResult<Entity> {
 
 async fn add_task(req: AddTask, ctx: Context) -> ApiResult<Task> {
     let id = req.entity_id;
-    let task: Task = req.into();
+    let task = req.into();
 
-    ctx.tasks().insert_one(&task, None).await?;
-
-    if ctx
-        .entities()
-        .update_one(
-            doc! { "id": id },
-            doc! { "$push": { "tasks": task.id } },
-            None,
-        )
-        .await?
-        .modified_count
-        == 0
-    {
-        Err(ApiError::entity_not_found(&id))
-    } else {
-        Ok(task)
-    }
+    ctx.add_task(&id, task).await
 }
 
 async fn del_task(req: DelTask, ctx: Context) -> ApiResult<Task> {
     let DelTask { task_id } = req;
 
-    // Make sure this exists
-    let task = ctx
-        .tasks()
-        .find_one_and_delete(doc! { "id": task_id }, None)
-        .await?
-        .ok_or_else(|| ApiError::task_not_found(&task_id))?;
-
-    // Delete the task from the entity that holds it
-    ctx.entities()
-        .update_one(
-            doc! { "id": task.entity },
-            doc! { "tasks": { "$pull": task_id } },
-            None,
-        )
-        .await?;
-
-    Ok(task)
+    ctx.del_task(&task_id).await
 }
 
 async fn update_setting(req: UpdateSetting, ctx: Context) -> ApiResult<User> {
     let UpdateSetting { event_filter } = req;
-    let user_id = ctx.assert_user_claims()?.id();
+    let id = ctx.assert_user_claims()?.id();
 
-    let serialized =
-        to_bson(&event_filter).map_err(|_| ApiError::bad_request("Invalid event filter"))?;
-
-    ctx.users()
-        .find_one_and_update(
-            doc! { "id": user_id },
-            doc! { "$set": { "event_filter": serialized } },
-            FindOneAndUpdateOptions::builder()
-                .return_document(ReturnDocument::After)
-                .build(),
-        )
-        .await?
-        .ok_or_else(|| ApiError::user_not_found_with_id(&user_id))
+    ctx.update_setting(&id, &event_filter).await
 }
 
 async fn get_entities(_: GetEntities, ctx: Context) -> ApiResult<Entities> {
@@ -260,6 +203,17 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
         name,
     } = req;
 
+    if ctx
+        .find_user(&UserQuery::ByIm {
+            im: im.clone(),
+            im_payload: im_payload.clone(),
+        })
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::user_already_exists(&im, &im_payload));
+    };
+
     let user = User {
         im,
         im_payload,
@@ -273,7 +227,6 @@ async fn add_user(req: AddUser, ctx: Context) -> ApiResult<User> {
     };
 
     ctx.users().insert_one(&user, None).await?;
-
     Ok(user)
 }
 
@@ -289,7 +242,8 @@ async fn auth_user(_: AuthUser, ctx: Context) -> ApiResult<Authorized> {
         .find_user(&UserQuery::ById {
             user_id: claims.id(),
         })
-        .await?;
+        .await?
+        .ok_or_else(|| ApiError::user_not_found_with_id(&claims.id()))?;
 
     Ok(Authorized {
         user,
@@ -300,7 +254,10 @@ async fn auth_user(_: AuthUser, ctx: Context) -> ApiResult<Authorized> {
 async fn new_token(req: NewToken, ctx: Context) -> ApiResult<Token> {
     let NewToken { query } = &req;
 
-    let user = ctx.find_user(query).await?;
+    let user = ctx
+        .find_user(query)
+        .await?
+        .ok_or_else(|| ApiError::user_not_found_with_query(query))?;
 
     let (token, claim) = ctx.encode(&user.id, Privilege::User)?;
 

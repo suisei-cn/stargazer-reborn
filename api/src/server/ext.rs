@@ -72,6 +72,13 @@ impl From<mongodb::error::Error> for ApiError {
     }
 }
 
+impl From<mongodb::bson::ser::Error> for ApiError {
+    fn from(detail: mongodb::bson::ser::Error) -> Self {
+        tracing::error!(?detail, "Bson serialize error");
+        Self::internal()
+    }
+}
+
 impl From<sg_auth::Error> for ApiError {
     fn from(err: sg_auth::Error) -> Self {
         use sg_auth::Error::{Argon, Bson, Mongo};

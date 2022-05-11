@@ -7,7 +7,7 @@ use http::StatusCode;
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
 
-use crate::rpc::Response;
+use crate::{model::UserQuery, rpc::Response};
 
 #[cfg_attr(
     feature = "server",
@@ -95,6 +95,21 @@ impl ApiError {
     pub fn user_not_found_with_im(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
         Self::new(StatusCode::NOT_FOUND).explain(format!(
             "Cannot find user with im `{}` and im_payload `{}`",
+            im.as_ref(),
+            im_payload.as_ref()
+        ))
+    }
+
+    pub fn user_not_found_with_query(query: &UserQuery) -> Self {
+        match query {
+            UserQuery::ById { user_id } => Self::user_not_found_with_id(user_id),
+            UserQuery::ByIm { im, im_payload } => Self::user_not_found_with_im(im, im_payload),
+        }
+    }
+
+    pub fn user_already_exists(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
+        Self::new(StatusCode::CONFLICT).explain(format!(
+            "User already exists im `{}` and im_payload `{}`",
             im.as_ref(),
             im_payload.as_ref()
         ))
