@@ -50,25 +50,28 @@ pub mod model;
 ///
 /// # Example
 ///
-/// **NOTE**: this example is not compiling because some mysterious error where
-/// rust says i'm trying to inherent impl for types not in this crate.
-/// But it works perfectly fine outside doc test.
+/// ```
+/// # #[macro_use] extern crate api;
+/// #
+/// # use api::methods;
+/// # use sg_core::models::User;
+/// #
+/// # fn main() {
+/// #
+/// methods! {
+///   // If response object has fields, define it and implement `Response` for it.
+///   get_user_with_impl := GetUserWithImpl {
+///       user_id: String
+///   } -> UserSettings {
+///       settings: String
+///   },
 ///
-/// ```rust,compile_fail
-///
-/// #  struct DummyUser {}
-/// // If response object has fields, define it and implement `Response` for it.
-/// get_user_with_impl := GetUserWithImpl {
-///     user_id: String
-/// } -> UserSettings {
-///     settings: String
-/// },
-///
-/// // If response object is defined elsewhere, do not add brace.
-/// // This will only implement the trait instead of re-define it.
-/// get_user_test := GetUserTest {
-///     user_id: String
-/// } -> DummyUser
+///   // If response object is defined elsewhere, do not add brace.
+///   // This will only implement the trait instead of re-define it.
+///   get_user_test := GetUserTest {
+///       user_id: String
+///   } -> User
+/// # }}
 /// ```
 #[macro_export]
 macro_rules! methods {

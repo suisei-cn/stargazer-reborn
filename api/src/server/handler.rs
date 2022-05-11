@@ -18,10 +18,7 @@ use axum::{extract::Extension, Router};
 use color_eyre::Result;
 use futures::{future::try_join, TryStreamExt};
 use http::Method;
-use mongodb::{
-    bson::{doc, to_document, Uuid},
-    options::{FindOneAndUpdateOptions, ReturnDocument},
-};
+use mongodb::bson::{doc, Uuid};
 use sg_auth::{Permission, PermissionSet};
 use sg_core::models::{Entity, EventFilter, Task, User};
 use tower_http::{cors, trace};

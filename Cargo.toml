@@ -1,2 +1,11 @@
 [workspace]
-members = ["api", "auth", "coordinator", "core", "middlewares/delay", "middlewares/translate", "workers/bililive", "workers/twitter"]
+members = [
+  "api",
+  "auth",
+  "coordinator",
+  "core",
+  "middlewares/delay",
+  "middlewares/translate",
+  "workers/bililive",
+  "workers/twitter",
+]

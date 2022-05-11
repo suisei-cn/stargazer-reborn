@@ -79,19 +79,30 @@ use std::collections::HashSet;
 use crate::model::UserQuery;
 
 use mongodb::bson::Uuid;
+use once_cell::sync::Lazy;
 use prep::prep;
+use rand::Rng;
 use reqwest::Url;
 use sg_core::models::{EventFilter, User};
+
+static URL: Lazy<Url> = Lazy::new(|| Url::parse("http://placekitten.com/114/514").unwrap());
+
+fn gen_payload() -> String {
+    rand::thread_rng()
+        .gen_range(-100_000_000..100_000_000_i64)
+        .to_string()
+}
 
 #[test]
 fn test_new_user() {
     let mut c = prep();
+    let payload = gen_payload();
 
     let res1 = c
         .add_user(
             "tg".to_owned(),
-            "TEST".to_owned(),
-            "http://placekitten.com/114/514".parse::<Url>().unwrap(),
+            payload.clone(),
+            URL.clone(),
             "Pop".to_owned(),
         )
         .unwrap();
@@ -99,13 +110,14 @@ fn test_new_user() {
     let User {
         id,
         im,
+        im_payload,
         name,
         avatar,
         event_filter,
-        ..
     } = &res1;
 
     assert_eq!(im, "tg");
+    assert_eq!(im_payload, &payload);
     assert_eq!(name, "Pop");
     assert_eq!(
         avatar.as_ref().map(Url::as_str).unwrap(),
@@ -120,6 +132,17 @@ fn test_new_user() {
     );
 
     tracing::info!(id = ?id, "New user added");
+
+    // Make sure duplicate users are not allowed
+    let err = c
+        .add_user("tg", payload, URL.clone(), "SomeOtherName")
+        .unwrap_err();
+    match err {
+        crate::client::Error::Api(err) => {
+            assert_eq!(err.error[0].as_str(), "Conflict");
+        }
+        _ => panic!("Unexpected error: {:?}", err),
+    }
 
     let token = c.new_token(UserQuery::ById { user_id: *id }).unwrap().token;
 
@@ -176,8 +199,8 @@ fn test_update_user_settings() {
     let user_id = c
         .add_user(
             "tg".to_owned(),
-            "TEST".to_owned(),
-            "http://placekitten.com/114/514".parse::<Url>().unwrap(),
+            gen_payload(),
+            URL.clone(),
             "Pop".to_owned(),
         )
         .unwrap()
