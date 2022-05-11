@@ -54,44 +54,51 @@ impl StdError for ApiError {}
 impl ApiError {
     pub fn new(status: StatusCode) -> Self {
         let error = match status.canonical_reason() {
-            Some(reason) => vec![reason.to_string()],
+            Some(reason) => vec![reason.to_owned()],
             None => vec![],
         };
         Self { error, status }
     }
 
     /// Push an explanatory error message to the error list.
+    #[inline]
     pub fn explain(mut self, error: impl Into<String>) -> Self {
         self.error.push(error.into());
         self
     }
 
     /// Throw multiple error explanation at once.
-    pub fn tirade<I, Item>(mut self, error: I) -> Self
+    #[inline]
+    pub fn tirade<I, S>(mut self, error: I) -> Self
     where
-        Item: Into<String>,
-        I: IntoIterator<Item = Item>,
+        S: Into<String>,
+        I: IntoIterator<Item = S>,
     {
         self.error.extend(error.into_iter().map(Into::into));
         self
     }
 
+    #[inline]
     pub fn bad_token() -> Self {
-        Self::new(StatusCode::BAD_REQUEST).explain("Token is either expired or in bad shape")
+        Self::new(StatusCode::UNAUTHORIZED).explain("Token is either expired or in bad shape")
     }
 
+    #[inline]
     pub fn missing_token() -> Self {
         Self::new(StatusCode::UNAUTHORIZED).explain("Token is missing")
     }
 
+    #[inline]
     pub fn unauthorized() -> Self {
         Self::new(StatusCode::UNAUTHORIZED).explain("Not permitted to access")
     }
 
+    #[inline]
     pub fn user_not_found_with_id(user_id: &Uuid) -> Self {
         Self::new(StatusCode::NOT_FOUND).explain(format!("Cannot find user with ID `{}`", user_id))
     }
 
+    #[inline]
     pub fn user_not_found_with_im(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
         Self::new(StatusCode::NOT_FOUND).explain(format!(
             "Cannot find user with im `{}` and im_payload `{}`",
@@ -100,6 +107,7 @@ impl ApiError {
         ))
     }
 
+    #[inline]
     pub fn user_not_found_with_query(query: &UserQuery) -> Self {
         match query {
             UserQuery::ById { user_id } => Self::user_not_found_with_id(user_id),
@@ -107,6 +115,7 @@ impl ApiError {
         }
     }
 
+    #[inline]
     pub fn user_already_exists(im: impl AsRef<str>, im_payload: impl AsRef<str>) -> Self {
         Self::new(StatusCode::CONFLICT).explain(format!(
             "User already exists im `{}` and im_payload `{}`",
@@ -115,19 +124,23 @@ impl ApiError {
         ))
     }
 
+    #[inline]
     pub fn entity_not_found(entity_id: &Uuid) -> Self {
         Self::new(StatusCode::NOT_FOUND)
             .explain(format!("Cannot find entity with ID `{}`", entity_id))
     }
 
+    #[inline]
     pub fn task_not_found(task_id: &Uuid) -> Self {
         Self::new(StatusCode::NOT_FOUND).explain(format!("Cannot find task with ID `{}`", task_id))
     }
 
+    #[inline]
     pub fn bad_request(error: impl Into<String>) -> Self {
         Self::new(StatusCode::BAD_REQUEST).explain(error)
     }
 
+    #[inline]
     pub fn internal() -> Self {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR)
     }

@@ -47,12 +47,14 @@ impl Context {
         Ok(Self::new_with_db(db, jwt, config))
     }
 
+    #[inline]
     #[must_use]
     pub fn config(&self) -> &Config {
         &self.config
     }
 
     /// Construct self with preconnected database.
+    #[inline]
     pub fn new_with_db(db: Database, jwt: Arc<JWTContext>, config: Arc<Config>) -> Self {
         let auth = AuthClient::new(db.collection(&config.auth_collection));
         Self {
@@ -83,12 +85,14 @@ impl Context {
     }
 
     /// Get the claims from the JWT token header.
+    #[inline]
     #[must_use]
     pub const fn claims(&self) -> Option<&Claims> {
         self.claims.as_ref()
     }
 
     /// Insert claims, if there's already one, return it
+    #[inline]
     pub fn set_claims(&mut self, claims: Claims) -> Option<Claims> {
         self.claims.replace(claims)
     }
@@ -97,6 +101,7 @@ impl Context {
     ///
     /// # Errors
     /// Fails when encoding failed. This is unlikely to happen, but if it does, it's a bug.
+    #[inline]
     pub fn encode(&self, user_id: &Uuid, privilege: Privilege) -> ApiResult<(String, Claims)> {
         self.jwt.encode(user_id, privilege).map_err(|detail| {
             tracing::error!(?detail, "Failed to encode JWT token");
@@ -104,31 +109,37 @@ impl Context {
         })
     }
 
+    #[inline]
     #[must_use]
     pub fn users(&self) -> Collection<User> {
         self.db.collection(&self.config.users_collection)
     }
 
+    #[inline]
     #[must_use]
     pub fn tasks(&self) -> Collection<Task> {
         self.db.collection(&self.config.tasks_collection)
     }
 
+    #[inline]
     #[must_use]
     pub fn entities(&self) -> Collection<Entity> {
         self.db.collection(&self.config.entities_collection)
     }
 
+    #[inline]
     #[must_use]
     pub fn groups(&self) -> Collection<Group> {
         self.db.collection(&self.config.groups_collection)
     }
 
+    #[inline]
     #[must_use]
     pub fn auth_db(&self) -> Collection<Bot> {
         self.db.collection(&self.config.auth_collection)
     }
 
+    #[inline]
     #[must_use]
     pub const fn auth(&self) -> &AuthClient {
         &self.auth
