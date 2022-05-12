@@ -18,7 +18,10 @@ use axum::{extract::Extension, Router};
 use color_eyre::Result;
 use futures::{future::try_join, TryStreamExt};
 use http::Method;
-use mongodb::bson::{doc, Uuid};
+use mongodb::{
+    bson::{doc, Uuid},
+    Database,
+};
 use sg_auth::{Permission, PermissionSet};
 use sg_core::models::{Entity, EventFilter, Task, User};
 use tower_http::{cors, trace};
@@ -28,6 +31,14 @@ use tower_http::{cors, trace};
 /// # Errors
 /// Fails on invalid db url
 pub async fn make_app(config: Config) -> Result<Router> {
+    make_app_with(config, None).await
+}
+
+/// Construct the router with given database.
+///
+/// # Errors
+/// Fails on invalid db url
+pub async fn make_app_with(config: Config, db: Option<Database>) -> Result<Router> {
     let config = Arc::new(config);
 
     let cors_layer = cors::CorsLayer::new()
@@ -41,7 +52,10 @@ pub async fn make_app(config: Config) -> Result<Router> {
     let bot_guard = JWTGuard::new(jwt.clone(), Privilege::Bot).into_layer();
     let admin_guard = JWTGuard::new(jwt.clone(), Privilege::Admin).into_layer();
 
-    let ctx = Context::new(jwt, config).await?;
+    let ctx = match db {
+        Some(db) => Context::new_with_db(db, jwt, config),
+        None => Context::new(jwt, config).await?,
+    };
 
     let api = Router::new()
         .mount(add_user)

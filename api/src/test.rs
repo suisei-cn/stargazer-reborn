@@ -1,76 +1,152 @@
+//! Test suite
+//!
+//! This test will temporarily generate a record in auth database with full access privilege, which
+//! will be cleaned up after the test.
+//!
+//! Username: "test"
+//! Password: "test"
 mod prep {
     use std::{
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Once,
-        },
-        thread::available_parallelism,
+        ops::{Deref, DerefMut},
+        sync::atomic::{AtomicBool, AtomicU16, Ordering},
         time::Duration,
     };
 
+    use once_cell::sync::OnceCell;
     use sg_auth::{AuthClient, PermissionRecord, PermissionSet};
-    use tracing::metadata::LevelFilter;
+    use tokio::{runtime::Runtime, time::timeout};
+    use tracing::{info, metadata::LevelFilter};
 
     use crate::{
         client::blocking::Client,
-        server::{serve_with_config, Config},
+        server::{make_app_with, Config},
     };
 
-    static INIT: Once = Once::new();
-    static WAITED: AtomicBool = AtomicBool::new(false);
+    static CURRENT: OnceCell<(Runtime, AuthClient)> = OnceCell::new();
+    static INITIALIZED: AtomicBool = AtomicBool::new(false);
+    static TEST_RUNNING: AtomicU16 = AtomicU16::new(0);
 
-    pub fn prep() -> Client {
-        INIT.call_once(|| {
-            tracing_subscriber::fmt()
-                .with_max_level(LevelFilter::INFO)
-                .init();
+    pub struct TestGuard {
+        client: Client,
+    }
 
-            tracing::info!("Initializing test suite");
+    impl TestGuard {
+        pub fn new(client: Client) -> Self {
+            TEST_RUNNING.fetch_add(1, Ordering::Acquire);
+            Self { client }
+        }
+    }
 
-            color_eyre::install().unwrap();
+    impl Drop for TestGuard {
+        fn drop(&mut self) {
+            if TEST_RUNNING.fetch_sub(1, Ordering::Release) != 1 {
+                return;
+            }
 
-            // Spawn a server into background, which ideally will be destroyed when all tests are finished.
-            std::thread::spawn(|| {
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(available_parallelism().unwrap().into())
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .block_on(async {
-                        let mongo_uri = std::env::var("MONGODB_URI")
-                            .unwrap_or_else(|_| "mongodb://localhost:27017".to_owned());
+            info!("Last running test stopped, start cleaning");
 
-                        let col = mongodb::Client::with_uri_str(&mongo_uri)
-                            .await
-                            .unwrap()
-                            .database("stargazer-reborn")
-                            .collection::<PermissionRecord>("auth");
-
-                        AuthClient::new(col)
-                            .new_record("test", "test", PermissionSet::FULL)
-                            .await
-                            .unwrap();
-
-                        serve_with_config(Config {
-                            bind: "127.0.0.1:8080".parse().unwrap(),
-                            token_timeout: Duration::from_secs(0),
-                            mongo_uri,
-                            ..Config::default()
-                        })
-                        .await
-                        .unwrap();
-                    });
+            let (rt, auth) = CURRENT.get().unwrap();
+            rt.block_on(async move {
+                auth.delete_record("test").await.unwrap();
             });
+        }
+    }
+
+    impl Deref for TestGuard {
+        type Target = Client;
+        fn deref(&self) -> &Self::Target {
+            &self.client
+        }
+    }
+
+    impl DerefMut for TestGuard {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.client
+        }
+    }
+
+    /// One time initialization of the test suite.
+    ///
+    /// This will spin up a runtime, register test admin and start the server
+    fn init() -> (Runtime, AuthClient) {
+        tracing_subscriber::fmt()
+            .with_max_level(LevelFilter::INFO)
+            .init();
+
+        color_eyre::install().unwrap();
+
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let (server, app, auth) = rt.block_on(async {
+            let mongo_uri = std::env::var("MONGODB_URI")
+                .unwrap_or_else(|_| "mongodb://localhost:27017".to_owned());
+
+            info!(%mongo_uri, "Connecting to mongodb");
+
+            let db = mongodb::Client::with_uri_str(&mongo_uri)
+                .await
+                .unwrap()
+                .database("stargazer-reborn");
+            let col = db.collection::<PermissionRecord>("auth");
+
+            let auth = AuthClient::new(col);
+            timeout(
+                Duration::from_secs(1),
+                auth.new_record("test", "test", PermissionSet::FULL),
+            )
+            .await
+            .expect("Failed to connect to mongodb")
+            .unwrap();
+
+            let server = axum::Server::bind(&"127.0.0.1:8080".parse().unwrap());
+
+            let app = make_app_with(
+                Config {
+                    token_timeout: Duration::from_secs(0),
+                    mongo_uri,
+                    ..Config::default()
+                },
+                Some(db),
+            )
+            .await
+            .unwrap()
+            .into_make_service();
+
+            (server, app, auth)
         });
 
-        if !WAITED.load(Ordering::Acquire) {
-            std::thread::sleep(Duration::from_secs(2));
-            WAITED.store(true, Ordering::Release);
+        rt.spawn(async move {
+            tracing::info!("Server starting");
+
+            INITIALIZED.store(true, Ordering::Release);
+
+            server.serve(app).await.unwrap();
+
+            tracing::info!("Server stopped");
+        });
+
+        (rt, auth)
+    }
+
+    pub fn prep() -> TestGuard {
+        CURRENT.get_or_init(init);
+
+        let start = std::time::Instant::now();
+
+        while !INITIALIZED.load(Ordering::Acquire) {
+            std::thread::sleep(Duration::from_millis(100));
+            assert!(
+                start.elapsed().as_secs() <= 3,
+                "Initialize test suite timeout"
+            );
         }
 
         let mut c = Client::new("http://127.0.0.1:8080/v1/").unwrap();
         c.login_and_store("test", "test").unwrap();
-        c
+        TestGuard::new(c)
     }
 }
 
