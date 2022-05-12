@@ -1,5 +1,10 @@
 #![allow(clippy::wildcard_imports, clippy::default_trait_access)]
 
+use std::{
+    fmt::{Debug, Formatter},
+    sync::Arc,
+};
+
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
@@ -19,7 +24,7 @@ mod_use::mod_use![model, error];
 #[derive(Clone)]
 pub struct AuthClient {
     collection: Collection<PermissionRecord>,
-    argon: Argon2<'static>,
+    argon: Arc<Argon2<'static>>,
 }
 
 impl AuthClient {
