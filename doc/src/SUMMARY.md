@@ -4,6 +4,8 @@
 
 - [Core](./core.md)
 
+- [Configuration](./config.md)
+
 - [Api](./api/index.md)
 
   - [RPC](./api/rpc.md)
