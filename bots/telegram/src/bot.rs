@@ -50,7 +50,7 @@ pub async fn start() -> Result<()> {
 
 async fn init(config: &Config) -> Result<()> {
     let reqwest_client = reqwest::Client::new();
-    let bot = TeloxideBot::with_client(&config.bot_token, reqwest_client.clone())
+    let bot = TeloxideBot::with_client(&config.tg_token, reqwest_client.clone())
         .parse_mode(ParseMode::Html);
     let me = bot.get_me().send().await?;
     info!(username = %me.username(), "Telegram Bot API logged in");
@@ -133,16 +133,18 @@ async fn handle_event(event: Event) -> Result<()> {
 
 #[tokio::test]
 async fn test_bot() {
-    use tracing::level_filters::LevelFilter;
+    use tracing::{level_filters::LevelFilter, warn};
 
-    let level = std::env::var("TG_LOG");
-    let level = level.as_deref().unwrap_or("info");
+    let level = std::env::var("TG_LOG")
+        .as_deref()
+        .unwrap_or("info")
+        .parse::<LevelFilter>()
+        .unwrap();
 
+    tracing_subscriber::fmt().with_max_level(level).init();
+    warn!("This test requires proper environment variables being set. See book.stargazer.sh for details.");
     dotenv::dotenv().unwrap();
     color_eyre::install().unwrap();
-    tracing_subscriber::fmt()
-        .with_max_level(level.parse::<LevelFilter>().unwrap())
-        .init();
 
     tokio::spawn(sg_api::server::serve());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;

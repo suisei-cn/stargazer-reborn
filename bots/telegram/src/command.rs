@@ -27,7 +27,7 @@ fn match_url(text: &str) -> Option<&str> {
     Some(PATTERN.captures(text)?.get(1)?.as_str())
 }
 
-async fn get_chat_avatar(username: &str) -> Result<Option<url::Url>> {
+async fn get_chat_avatar(username: &str) -> Result<Option<reqwest::Url>> {
     let html = reqwest::get(format!("https://t.me/{}", username))
         .await?
         .text()
