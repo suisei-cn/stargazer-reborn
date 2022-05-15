@@ -118,7 +118,7 @@ pub async fn start() -> Result<()> {
     Ok(())
 }
 
-async fn start_bot() -> Result<()> {
+pub(crate) async fn start_bot() -> Result<()> {
     let bot = use_bot().clone();
 
     teloxide::commands_repl(
