@@ -33,7 +33,7 @@ assert_eq!(resp, resp_obj.to_json());
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
     error: Vec<String>,
-    #[serde(skip)]
+    #[serde(with = "http_serde::status_code")]
     status: StatusCode,
 }
 
