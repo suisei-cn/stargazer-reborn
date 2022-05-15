@@ -11,3 +11,7 @@ pub fn amqp_exchange() -> String {
 pub fn api_url() -> Url {
     Url::parse("http://127.0.0.1:8000/v1/").unwrap()
 }
+
+pub fn frontend_token_param() -> String {
+    String::from("token")
+}

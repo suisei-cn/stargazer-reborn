@@ -26,6 +26,11 @@ pub struct Config {
     pub api_password: String,
     /// Telegram bot token.
     pub tg_token: String,
+    /// Base url of frontend. E.g. `https://stargazer.sh`
+    pub frontend_url: Url,
+    /// URL Query param used to pass in token. E.g. `token` as in `https://stargazer.sh?token=91782y39dnfkjbeighopsjd`.
+    #[serde(default = "default::frontend_token_param")]
+    pub frontend_token_param: String,
 }
 
 impl Config {
@@ -54,6 +59,7 @@ mod tests {
             jail.set_env("BOT_API_USERNAME", "admin");
             jail.set_env("BOT_API_PASSWORD", "admin");
             jail.set_env("BOT_TG_TOKEN", "some_token");
+            jail.set_env("BOT_FRONTEND_URL", "https://stargazer.sh");
             assert_eq!(
                 Config::from_env().unwrap(),
                 Config {
@@ -63,6 +69,8 @@ mod tests {
                     api_username: String::from("admin"),
                     api_password: String::from("admin"),
                     tg_token: String::from("some_token"),
+                    frontend_url: Url::parse("https://stargazer.sh").unwrap(),
+                    frontend_token_param: String::from("token"),
                 }
             );
             Ok(())
@@ -78,6 +86,8 @@ mod tests {
             jail.set_env("BOT_API_USERNAME", "admin");
             jail.set_env("BOT_API_PASSWORD", "admin");
             jail.set_env("BOT_TG_TOKEN", "some_token");
+            jail.set_env("BOT_FRONTEND_URL", "https://stargazer.sh");
+            jail.set_env("BOT_FRONTEND_TOKEN_PARAM", "token123");
             assert_eq!(
                 Config::from_env().unwrap(),
                 Config {
@@ -87,6 +97,8 @@ mod tests {
                     api_username: String::from("admin"),
                     api_password: String::from("admin"),
                     tg_token: String::from("some_token"),
+                    frontend_url: Url::parse("https://stargazer.sh").unwrap(),
+                    frontend_token_param: String::from("token123"),
                 }
             );
             Ok(())
