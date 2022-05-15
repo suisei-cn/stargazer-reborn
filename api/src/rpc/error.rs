@@ -96,7 +96,11 @@ impl ApiError {
 
     #[inline]
     #[must_use]
-    pub fn matches_status(&self, status: StatusCode) -> bool {
+    pub fn matches_status(&self, status: impl TryInto<StatusCode>) -> bool {
+        let status = match status.try_into() {
+            Ok(status) => status,
+            Err(_) => return false,
+        };
         self.status == status
     }
 

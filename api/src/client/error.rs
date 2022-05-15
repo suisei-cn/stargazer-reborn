@@ -1,3 +1,4 @@
+use http::StatusCode;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,6 +26,18 @@ impl Error {
         } else {
             None
         }
+    }
+
+    #[must_use]
+    pub fn matches_api_err(&self, msg: &str) -> bool {
+        self.as_api()
+            .map_or(false, |api_error| api_error.matches(msg))
+    }
+
+    #[must_use]
+    pub fn matches_api_status(&self, status: impl TryInto<StatusCode>) -> bool {
+        self.as_api()
+            .map_or(false, |api_error| api_error.matches_status(status))
     }
 
     // Allow b/c destructor cannot be evaluated at compile time
