@@ -1,11 +1,11 @@
 use color_eyre::Result;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use sg_api::model::UserQuery;
 use teloxide::{prelude::*, types::Message, utils::command::BotCommands};
 use tracing::{debug, trace};
 
-use crate::{Bot, TokenExt, CLIENT};
+use crate::{get_bot_username, get_client, Bot, TokenExt};
 
 #[derive(Debug, Clone, BotCommands)]
 #[command(rename = "lowercase", description = "These commands are supported")]
@@ -17,7 +17,7 @@ pub enum Command {
     #[command(description = "Set preferences.")]
     Setting,
     #[command(description = "Delete your account.")]
-    DeleteAccount { confirmation: String },
+    Unregister { confirmation: String },
 }
 
 fn match_url(text: &str) -> Option<&str> {
@@ -36,58 +36,67 @@ async fn get_chat_avatar(username: &str) -> Result<Option<reqwest::Url>> {
     Ok(match_url(&html).and_then(|url| url.parse().ok()))
 }
 
+macro_rules! make_reply {
+    ($bot:ident,$msg:ident) => {{
+        |reply: String| async {
+            $bot.send_message($msg.chat.id, reply)
+                .reply_to_message_id($msg.id)
+                .send()
+                .await?;
+            Result::<()>::Ok(())
+        }
+    }};
+}
+
 /// Answer to command
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 pub async fn answer(bot: Bot, msg: Message, command: Command) -> Result<()> {
-    let client = CLIENT.get().expect("Client is not initialized");
-    let reply = |reply: String| async {
-        bot.send_message(msg.chat.id, reply)
-            .reply_to_message_id(msg.id)
-            .send()
-            .await?;
-        Result::<()>::Ok(())
-    };
+    let reply = make_reply!(bot, msg);
 
     debug!(?command, ?msg, "Received command");
 
     match command {
         Command::Help => {
-            static BOT_USER_NAME: OnceCell<Option<String>> = OnceCell::new();
-            let mut description = Command::descriptions();
-            match BOT_USER_NAME.get() {
-                Some(Some(username)) => description = description.username(username),
-                Some(None) => {}
-                None => {
-                    let me = bot.get_me().send().await?;
-                    drop(BOT_USER_NAME.set(me.user.username));
-                    // Safe b/c just initialized
-                    if let Some(username) = unsafe { BOT_USER_NAME.get_unchecked() } {
-                        description = description.username(username);
-                    }
-                }
-            };
-            reply(description.to_string()).await?;
+            static DESCRIPTION: Lazy<String> = Lazy::new(|| {
+                Command::descriptions()
+                    .username(get_bot_username())
+                    .to_string()
+            });
+            reply(DESCRIPTION.clone()).await?;
         }
-        Command::Register => {
-            let chat_id = msg.chat.id.to_string();
-            let avatar = if let Some(username) = msg.chat.username() {
-                get_chat_avatar(username).await?
-            } else {
-                None
-            };
+        Command::Register => handle_register(bot, msg).await?,
+        Command::Setting => handle_setting(bot, msg).await?,
+        Command::Unregister { confirmation } => handle_unregister(confirmation, bot, msg).await?,
+    };
 
-            // Title is available in all public chats
-            // If it is not available, it means that the chat is private
-            let name = msg.chat.title().map_or_else(
-                || {
-                    msg.from()
-                        .expect("Command in private chat must be sent from someone")
-                        .full_name()
-                },
-                ToOwned::to_owned,
-            );
-            client.add_user("telegram", chat_id, avatar, name).await?;
+    Ok(())
+}
+
+async fn handle_register(bot: Bot, msg: Message) -> Result<()> {
+    let client = get_client();
+
+    let reply = make_reply!(bot, msg);
+
+    let chat_id = msg.chat.id.to_string();
+    let avatar = if let Some(username) = msg.chat.username() {
+        get_chat_avatar(username).await?
+    } else {
+        None
+    };
+
+    // Title is available in all public chats
+    // If it is not available, it means that the chat is private
+    let name = msg.chat.title().map_or_else(
+        || {
+            msg.from()
+                .expect("Command in private chat must have `from`")
+                .full_name()
+        },
+        ToOwned::to_owned,
+    );
+    match client.add_user("telegram", chat_id, avatar, name).await {
+        Ok(_) => {
             let token = client
                 .new_token(UserQuery::ByIm {
                     im: "telegram".to_owned(),
@@ -96,13 +105,20 @@ pub async fn answer(bot: Bot, msg: Message, command: Command) -> Result<()> {
                 .await?;
 
             reply(format!(
-                    "Registered! Use <a href=\"https://stargazer.sh/?token={}\">this link</a> to start subscribing (valid for {})",
-                    token.token,
-                    token.valid_until_formatted()?
-                )
+                        "Registered! Use <a href=\"https://stargazer.sh/?token={}\">this link</a> to start subscribing (valid for {})",
+                        token.token,
+                        token.valid_until_formatted()?
+                    )
             ).await?;
         }
-        Command::Setting => {
+        Err(error) => {
+            match error.as_api() {
+                Some(api_err) if api_err.error[0].as_str() == "Conflict" => {}
+                _ => {
+                    reply("Internal error".to_owned()).await?;
+                    return Err(error.into());
+                }
+            }
             let token = client
                 .new_token(UserQuery::ByIm {
                     im: "telegram".to_owned(),
@@ -111,33 +127,73 @@ pub async fn answer(bot: Bot, msg: Message, command: Command) -> Result<()> {
                 .await?;
 
             reply(format!(
-                "Use <a href=\"https://stargazer.sh/?token={}\">this link</a> to update setting (valid for {})",
+                "This account has already been registered! Use <a href=\"https://stargazer.sh/?token={}\">this link</a> to update preference (valid for {})",
                 token.token,
                 token.valid_until_formatted()?
             )).await?;
         }
-        Command::DeleteAccount { confirmation } => {
-            const CONFIRMATION: &str = "confirm";
-            const GET_CONFIRM: &str =
-                "Please use <code>/delete_account confirm</code> to confirm deleting account";
+    };
+    Ok(())
+}
 
-            match confirmation.to_lowercase().as_str().trim() {
-                CONFIRMATION => {
-                    let chat_id = msg.chat.id.to_string();
-                    client
-                        .del_user(UserQuery::ByIm {
-                            im: "telegram".to_owned(),
-                            im_payload: chat_id,
-                        })
-                        .await?;
+async fn handle_setting(bot: Bot, msg: Message) -> Result<()> {
+    let reply = make_reply!(bot, msg);
+
+    let token = get_client()
+        .new_token(UserQuery::ByIm {
+            im: "telegram".to_owned(),
+            im_payload: msg.chat.id.to_string(),
+        })
+        .await?;
+
+    reply(format!(
+                "Use <a href=\"https://stargazer.sh/?token={}\">this link</a> to update setting (valid for {})",
+                token.token,
+                token.valid_until_formatted()?
+            )).await?;
+
+    Ok(())
+}
+
+async fn handle_unregister(confirmation: String, bot: Bot, msg: Message) -> Result<()> {
+    const CONFIRMATION: &str = "confirm";
+    const GET_CONFIRM: &str = "Please use `/unregister confirm` to confirm deleting account";
+
+    let reply = make_reply!(bot, msg);
+
+    let client = get_client();
+
+    match confirmation.to_lowercase().as_str().trim() {
+        CONFIRMATION => {
+            let chat_id = msg.chat.id.to_string();
+            match client
+                .del_user(UserQuery::ByIm {
+                    im: "telegram".to_owned(),
+                    im_payload: chat_id,
+                })
+                .await
+            {
+                Ok(_) => {
                     reply("Account deleted".to_owned()).await?;
                 }
-                _ => {
-                    reply(GET_CONFIRM.to_owned()).await?;
+                Err(error)
+                    if error
+                        .as_api()
+                        .map_or(false, |x| x.error[0].as_str() == "Not Found") =>
+                {
+                    reply("This account is not registered yet".to_owned()).await?;
+                }
+                Err(error) => {
+                    reply("Internal error".to_owned()).await?;
+
+                    return Err(error.into());
                 }
             }
         }
-    };
+        _ => {
+            reply(GET_CONFIRM.to_owned()).await?;
+        }
+    }
 
     Ok(())
 }

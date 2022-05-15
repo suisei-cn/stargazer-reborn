@@ -2,8 +2,6 @@ use std::marker::PhantomData;
 
 use color_eyre::{eyre::Context, Result};
 use futures::{stream::FuturesUnordered, StreamExt};
-use once_cell::sync::OnceCell;
-use sg_api::client::Client;
 use sg_core::{
     models::Event,
     mq::{MessageQueue, RabbitMQ},
@@ -11,7 +9,7 @@ use sg_core::{
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{ChatId, ParseMode, Recipient},
+    types::{ChatId, Recipient},
     Bot as TeloxideBot,
 };
 use tokio::select;
@@ -21,8 +19,72 @@ use crate::{answer, config::Config, Command};
 
 pub type Bot = DefaultParseMode<TeloxideBot>;
 
-pub static BOT: OnceCell<Bot> = OnceCell::new();
-pub static CLIENT: OnceCell<Client> = OnceCell::new();
+mod statics {
+    use color_eyre::Result;
+    use once_cell::sync::OnceCell;
+    use sg_api::client::Client;
+    use teloxide::{prelude::*, types::ParseMode, Bot as TeloxideBot};
+    use tracing::{info, warn};
+
+    use crate::{Bot, Config};
+
+    static BOT: OnceCell<Bot> = OnceCell::new();
+    static CLIENT: OnceCell<Client> = OnceCell::new();
+    static BOT_USERNAME: OnceCell<String> = OnceCell::new();
+
+    #[must_use]
+    pub fn get_bot<'a>() -> &'a Bot {
+        BOT.get().expect("Bot is not initialized")
+    }
+
+    #[must_use]
+    pub fn get_client<'a>() -> &'a Client {
+        CLIENT.get().expect("Client is not initialized")
+    }
+
+    #[must_use]
+    pub fn get_bot_username<'a>() -> &'a str {
+        BOT_USERNAME.get().expect("Bot username is not initialized")
+    }
+
+    pub async fn try_init(config: &Config) -> Result<()> {
+        let reqwest_client = reqwest::Client::new();
+
+        let bot = TeloxideBot::with_client(&config.tg_token, reqwest_client.clone())
+            .parse_mode(ParseMode::Html);
+        let me = bot.get_me().send().await?;
+        info!(username = %me.username(), "Telegram Bot API logged in");
+        if BOT_USERNAME.set(me.username().to_owned()).is_err() {
+            warn!("`init()` has been runned multiple times");
+        };
+
+        drop(BOT.set(bot));
+
+        let mut client = Client::with_client(reqwest_client, config.api_url.clone())?;
+        client
+            .login_and_store(&config.api_username, &config.api_password)
+            .await?;
+        info!(username = %config.api_username, "API logged in");
+        drop(CLIENT.set(client));
+
+        Ok(())
+    }
+
+    pub async fn init(config: &Config) {
+        try_init(config).await.expect("Init failed");
+    }
+
+    pub async fn try_init_from_env() -> Result<()> {
+        let config = Config::from_env()?;
+        try_init(&config).await
+    }
+
+    pub async fn init_from_env() {
+        try_init_from_env().await.expect("Init from env failed");
+    }
+}
+
+pub use statics::*;
 
 /// Start the service.
 ///
@@ -30,7 +92,7 @@ pub static CLIENT: OnceCell<Client> = OnceCell::new();
 /// If the service fails to start or any error occurred during the service.
 pub async fn start() -> Result<()> {
     let config = Config::from_env()?;
-    init(&config).await?;
+    init(&config).await;
 
     select! {
         _ = tokio::signal::ctrl_c() => {
@@ -48,26 +110,8 @@ pub async fn start() -> Result<()> {
     Ok(())
 }
 
-async fn init(config: &Config) -> Result<()> {
-    let reqwest_client = reqwest::Client::new();
-    let bot = TeloxideBot::with_client(&config.tg_token, reqwest_client.clone())
-        .parse_mode(ParseMode::Html);
-    let me = bot.get_me().send().await?;
-    info!(username = %me.username(), "Telegram Bot API logged in");
-    BOT.set(bot).expect("Bot is already initialized");
-
-    let mut client = Client::with_client(reqwest_client, config.api_url.clone())?;
-    client
-        .login_and_store(&config.api_username, &config.api_password)
-        .await?;
-    info!(username = %config.api_username, "API logged in");
-    CLIENT.set(client).expect("Client is already initialized");
-
-    Ok(())
-}
-
 async fn start_bot() -> Result<()> {
-    let bot = BOT.get().expect("Bot is not initialized").clone();
+    let bot = get_bot().clone();
 
     teloxide::commands_repl(bot, answer, PhantomData::<Command>).await;
     Ok(())
@@ -102,9 +146,9 @@ async fn handle_event(event: Event) -> Result<()> {
     } = event;
     debug!(%id, %kind, %entity, ?fields, "Handling event");
 
-    let client = CLIENT.get().expect("Client not initialized");
+    let client = get_client();
     let interest = client.get_interest(entity, kind, "telegram").await?;
-    let bot = BOT.get().expect("Bot not initialized");
+    let bot = get_bot();
 
     let text = "Test"; // TODO: implement composing message
 
@@ -149,7 +193,6 @@ async fn test_bot() {
     tokio::spawn(sg_api::server::serve());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    let config = Config::from_env().unwrap();
-    init(&config).await.unwrap();
+    init_from_env().await;
     start_bot().await.unwrap();
 }
