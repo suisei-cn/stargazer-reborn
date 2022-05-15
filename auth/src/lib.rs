@@ -1,5 +1,10 @@
 #![allow(clippy::wildcard_imports, clippy::default_trait_access)]
 
+use std::{
+    fmt::{Debug, Formatter},
+    sync::Arc,
+};
+
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
@@ -19,7 +24,28 @@ mod_use::mod_use![model, error];
 #[derive(Clone)]
 pub struct AuthClient {
     collection: Collection<PermissionRecord>,
-    argon: Argon2<'static>,
+    argon: Arc<Argon2<'static>>,
+}
+
+impl Debug for AuthClient {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Fake struct to mimic debug.
+        #[derive(Debug)]
+        #[allow(dead_code)]
+        struct Argon2<'a> {
+            params: &'a argon2::Params,
+        }
+
+        f.debug_struct("AuthClient")
+            .field("collection", &self.collection)
+            .field(
+                "argon",
+                &Argon2 {
+                    params: self.argon.params(),
+                },
+            )
+            .finish()
+    }
 }
 
 impl AuthClient {
@@ -145,6 +171,23 @@ impl AuthClient {
             .map(|x| x.permissions());
 
         Ok(res)
+    }
+
+    /// Delete a record.
+    ///
+    /// Returns an `Ok(Some(PermissionSet))` if the record is deleted.
+    ///
+    /// # Errors
+    /// Returns an `Err` if unable to delete the record.
+    /// Returns an `Ok(None)` if the record does not exist.
+    pub async fn delete_record(
+        &self,
+        username: impl AsRef<str> + Send,
+    ) -> Result<Option<PermissionRecord>> {
+        self.collection
+            .find_one_and_delete(doc! { "username": username.as_ref() }, None)
+            .await
+            .map_err(Into::into)
     }
 
     /// Look up permission of a user by username and password.
