@@ -332,7 +332,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -445,7 +445,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -606,7 +606,7 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -632,7 +632,7 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "url",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -773,7 +773,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -1697,7 +1697,7 @@ dependencies = [
  "trust-dns-proto",
  "trust-dns-resolver",
  "typed-builder",
- "uuid",
+ "uuid 0.8.2",
  "webpki-roots",
 ]
 
@@ -3067,7 +3067,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -3165,7 +3165,7 @@ dependencies = [
  "tokio-reactor-trait",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.1.0",
 ]
 
 [[package]]
@@ -3249,6 +3249,12 @@ dependencies = [
  "getrandom",
  "serde",
 ]
+
+[[package]]
+name = "uuid"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93bbc61e655a4833cf400d0d15bf3649313422fa7572886ad6dab16d79886365"
 
 [[package]]
 name = "valuable"
