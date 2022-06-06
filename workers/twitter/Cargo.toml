@@ -25,7 +25,7 @@ tokio-executor-trait = "2.1"
 tokio-reactor-trait = "1.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = "0.8"
+uuid = "1.1"
 
 [dev-dependencies]
 figment = { version = "0.10", features = ["test"] }
