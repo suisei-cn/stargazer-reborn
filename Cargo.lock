@@ -1735,9 +1735,9 @@ dependencies = [
 
 [[package]]
 name = "mod_use"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f5c8279ccdb8c122713aacb8f90c6ffa748542b6995a85d0b2e71b751218517"
+checksum = "d95ee98a292cf91c2f5b3f35424773af16842a68b3be33b389137606b2633539"
 
 [[package]]
 name = "mongodb"
