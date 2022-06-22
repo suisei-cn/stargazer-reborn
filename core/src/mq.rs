@@ -2,7 +2,7 @@
 
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::{iter, vec};
@@ -191,6 +191,19 @@ impl Middlewares {
         let mut middlewares: Vec<_> = s.split('.').skip(1).map(ToString::to_string).collect();
         middlewares.pop();
         Self { middlewares }
+    }
+}
+
+impl Deref for Middlewares {
+    type Target = [String];
+    fn deref(&self) -> &Self::Target {
+        &self.middlewares
+    }
+}
+
+impl DerefMut for Middlewares {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.middlewares
     }
 }
 

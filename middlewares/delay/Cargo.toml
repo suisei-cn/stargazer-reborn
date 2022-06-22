@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sg-core = { package = "core", path = "../../core", features = ["mq"] }
 tap = "1.0"
-tokio = { version = "1.17", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
+tokio = { version = "1.19", features = ["rt", "rt-multi-thread", "parking_lot", "time", "net", "macros"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -25,7 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 assert_cmd = "2.0"
 figment = { version = "0.10", features = ["env", "test"] }
 rand = "0.8"
-rstest = "0.12"
+rstest = "0.14"
 sg-core = { package = "core", path = "../../core", features = ["mq", "mock"] }
 tempfile = "3.3"
 uuid = "0.8"
