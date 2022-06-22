@@ -86,9 +86,8 @@ pub struct JWTContext {
 }
 
 impl JWTContext {
-    // TODO: use pem instead of secret key to sign the token
     pub fn new(config: &Config) -> Self {
-        let bytes = config.bot_password.as_bytes();
+        let bytes = config.jwt_secret.as_bytes();
         let encode_key = EncodingKey::from_secret(bytes);
         let decode_key = DecodingKey::from_secret(bytes);
 
@@ -216,7 +215,7 @@ fn test_jwt() {
     let user_id = Uuid::parse_str("20bdc51a-a23e-4f38-bbff-739d2b8ded4d").unwrap();
 
     let config = Config {
-        bot_password: "Secret".to_string(),
+        jwt_secret: "Secret".to_string(),
         token_timeout: Duration::from_secs(1),
         ..Config::default()
     };

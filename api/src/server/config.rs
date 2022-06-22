@@ -20,8 +20,8 @@ pub struct Config {
     pub mongo_uri: String,
     /// MongoDB database name.
     pub mongo_db: String,
-    /// Secret password used to authenticate API requests from bot. This is also used to sign JWT tokens.
-    pub bot_password: String,
+    /// Secret used to sign JWT tokens.
+    pub jwt_secret: String,
     /// MongoDB collection name for `Users`.
     pub users_collection: String,
     /// MongoDB collection name for `Tasks`.
@@ -57,7 +57,7 @@ impl Default for Config {
             token_timeout: Duration::from_secs(10 * 60),
             mongo_uri: String::from("mongodb://localhost:27017"),
             mongo_db: String::from("stargazer-reborn"),
-            bot_password: String::from("TEST"),
+            jwt_secret: String::from("TEST"),
             users_collection: String::from("users"),
             tasks_collection: String::from("tasks"),
             entities_collection: String::from("entities"),
@@ -103,7 +103,7 @@ mod tests {
                     token_timeout: Duration::from_secs(60 * 10),
                     mongo_uri: String::from("mongodb://suichan:27017"),
                     mongo_db: String::from("db"),
-                    bot_password: String::from("password"),
+                    jwt_secret: String::from("password"),
                     users_collection: String::from("u"),
                     tasks_collection: String::from("t"),
                     entities_collection: String::from("e"),
