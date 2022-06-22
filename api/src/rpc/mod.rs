@@ -286,7 +286,7 @@ mod test_macro {
         let now = timestamp();
         let id = "26721d57-37f5-458c-afea-2b18baf34925";
         let resp = format!(
-            r#"{{"data":{{"error":["Not Found","Cannot find user with ID `{id}`"]}},"success":false,"time":"{now}"}}"#,
+            r#"{{"data":{{"error":["Not Found","Cannot find user with ID `{id}`"],"status":404}},"success":false,"time":"{now}"}}"#,
         );
 
         let mut resp_obj =
