@@ -1,15 +1,21 @@
 //! Context of the server. Contains the configuration and database handle.
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use color_eyre::Result;
+use futures::future::try_join;
+use futures::TryStreamExt;
 use mongodb::{
     bson::{doc, to_document, Uuid},
     options::{FindOneAndUpdateOptions, ReturnDocument},
     Client, Collection, Database,
 };
+use url::Url;
+
 use sg_auth::AuthClient;
 use sg_core::models::{Entity, EventFilter, Group, Meta, Task, User};
 
+use crate::model::{Entities, GetEntities};
 use crate::{
     model::{AddTaskParam, Bot, UserQuery},
     rpc::{ApiError, ApiResult},
@@ -17,7 +23,7 @@ use crate::{
 };
 
 /// Context being shared between handlers. This will be cloned every time a handler is called.
-/// So all underlineing data should be wrapped in Arc or similar shared reference thingy.
+/// So all underlying data should be wrapped in Arc or similar shared reference thingy.
 ///
 /// Since this is intended to be cloned everytime, `Option<Claims>` will be reset upon every request.
 #[must_use]
@@ -36,7 +42,6 @@ pub struct Context {
 }
 
 /// Context of the server. Contains the configuration and database handle.
-
 impl Context {
     /// # Errors
     /// Fail on invalid database url.
@@ -154,6 +159,40 @@ impl Context {
             .map_err(Into::into)
     }
 
+    pub async fn add_user(
+        &self,
+        im: String,
+        im_payload: String,
+        avatar: Option<Url>,
+        name: String,
+    ) -> ApiResult<User> {
+        if self
+            .find_user(&UserQuery::ByIm {
+                im: im.clone(),
+                im_payload: im_payload.clone(),
+            })
+            .await?
+            .is_some()
+        {
+            return Err(ApiError::user_already_exists(&im, &im_payload));
+        };
+
+        let user = User {
+            im,
+            im_payload,
+            avatar,
+            name,
+            event_filter: EventFilter {
+                entities: HashSet::default(),
+                kinds: HashSet::default(),
+            },
+            id: Uuid::default(),
+        };
+
+        self.users().insert_one(&user, None).await?;
+        Ok(user)
+    }
+
     /// # Errors
     /// Fail on database error or user not found
     pub async fn del_user(&self, query: &UserQuery) -> ApiResult<User> {
@@ -180,6 +219,34 @@ impl Context {
             .ok_or_else(|| ApiError::user_not_found_with_id(id))
     }
 
+    pub async fn add_entity(&self, meta: Meta, tasks: Vec<AddTaskParam>) -> ApiResult<Entity> {
+        let mut ent = Entity {
+            id: Uuid::new(),
+            meta,
+            tasks: vec![],
+        };
+
+        self.entities().insert_one(&ent, None).await?;
+
+        ent.tasks = self
+            .add_tasks(&ent.id, tasks.into_iter())
+            .await?
+            .into_iter()
+            .map(|x| x.id)
+            .collect();
+
+        Ok(ent)
+    }
+
+    /// # Errors
+    /// Fail on database error or entity not found
+    pub async fn find_entity(&self, id: &Uuid) -> ApiResult<Entity> {
+        self.entities()
+            .find_one(doc! { "id": id }, None)
+            .await?
+            .ok_or_else(|| ApiError::entity_not_found(id))
+    }
+
     /// # Errors
     /// Fail on database error, entity not found or failed to serialize meta
     pub async fn update_entity(&self, id: &Uuid, meta: &Meta) -> ApiResult<Entity> {
@@ -193,6 +260,32 @@ impl Context {
             )
             .await?
             .ok_or_else(|| ApiError::entity_not_found(id))
+    }
+
+    pub async fn del_entity(&self, id: &Uuid) -> ApiResult<Entity> {
+        // Get the entity, make sure it exists and get all related tasks
+        let entity = self
+            .entities()
+            .find_one_and_delete(doc! { "id": id }, None)
+            .await?
+            .ok_or_else(|| ApiError::entity_not_found(&id))?;
+
+        // Delete all related tasks
+        self.tasks()
+            .delete_many(doc! { "id": { "$in": &entity.tasks } }, None)
+            .await?;
+
+        Ok(entity)
+    }
+
+    pub async fn get_entities(&self) -> ApiResult<Entities> {
+        let (vtbs, groups) = try_join(
+            async { self.entities().find(None, None).await?.try_collect().await },
+            async { self.groups().find(None, None).await?.try_collect().await },
+        )
+        .await?;
+
+        Ok(Entities { vtbs, groups })
     }
 
     /// # Errors
@@ -253,13 +346,25 @@ impl Context {
         Ok(task)
     }
 
-    /// # Errors
-    /// Fail on database error or entity not found
-    pub async fn find_entity(&self, id: &Uuid) -> ApiResult<Entity> {
-        self.entities()
-            .find_one(doc! { "id": id }, None)
+    pub async fn get_interest(
+        &self,
+        entity_id: Uuid,
+        kind: &str,
+        im: &str,
+    ) -> ApiResult<Vec<User>> {
+        Ok(self
+            .users()
+            .find(
+                doc! {
+                  "event_filter.entities": entity_id,
+                  "event_filter.kinds": kind,
+                  "im": im,
+                },
+                None,
+            )
             .await?
-            .ok_or_else(|| ApiError::entity_not_found(id))
+            .try_collect()
+            .await?)
     }
 
     /// # Errors
