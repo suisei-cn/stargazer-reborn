@@ -10,7 +10,7 @@ sg-core = { package = "core", path = "../core" }
 sg-auth = { package = "auth", path = "../auth" }
 
 url             = "2.2.2"
-http            = "0.2.6"
+http            = "0.2.8"
 tracing         = "0.1.32"
 futures         = "0.3.21"
 mod_use         = "0.2.0"
