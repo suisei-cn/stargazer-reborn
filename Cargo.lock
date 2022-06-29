@@ -129,7 +129,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -409,7 +409,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -522,7 +522,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -683,7 +683,7 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -709,7 +709,7 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "url",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -850,7 +850,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1059,12 +1059,12 @@ dependencies = [
 
 [[package]]
 name = "fake"
-version = "2.4.3"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21a8531dd3a64fd1cfbe92fad4160bc2060489c6195fe847e045e5788f710bae"
+checksum = "4d68f517805463f3a896a9d29c1d6ff09d3579ded64a7201b4069f8f9c0d52fd"
 dependencies = [
  "rand",
- "uuid",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -1834,7 +1834,7 @@ dependencies = [
  "trust-dns-proto",
  "trust-dns-resolver",
  "typed-builder",
- "uuid",
+ "uuid 0.8.2",
  "webpki-roots",
 ]
 
@@ -2026,7 +2026,7 @@ dependencies = [
  "hmac 0.12.1",
  "lazy_static",
  "rc2",
- "sha1 0.10.1",
+ "sha1",
  "yasna",
 ]
 
@@ -2757,15 +2757,6 @@ dependencies = [
 
 [[package]]
 name = "sha1"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1da05c97445caa12d05e848c4a4fcbbea29e748ac28f7e80e9b010392063770"
-dependencies = [
- "sha1_smol",
-]
-
-[[package]]
-name = "sha1"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c77f4e7f65455545c2153c1253d25056825e77ee2533f0e41deb65a93a34852f"
@@ -3341,7 +3332,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -3439,7 +3430,7 @@ dependencies = [
  "tokio-reactor-trait",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -3521,9 +3512,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom",
- "md5",
  "serde",
- "sha1 0.6.1",
+]
+
+[[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+dependencies = [
+ "atomic",
+ "getrandom",
+ "md-5",
+ "sha1_smol",
 ]
 
 [[package]]
