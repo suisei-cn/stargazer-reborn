@@ -25,7 +25,7 @@ mongodb         = { version = "2.2.0-beta", features = ["bson-uuid-0_8"], defaul
 # Dependencies for bin `fake-data`
 rand = { version = "0.8.5", optional = true }
 uuid = { version = "0.8.2", optional = true }
-fake = { version = "2.4.3", optional = true, features = ["uuid"] }
+fake = { version = "2.5.0", optional = true, features = ["uuid"] }
 
 # Dependencies for client
 thiserror = { version = "1.0.30", optional = true }
