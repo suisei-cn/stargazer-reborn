@@ -20,7 +20,7 @@ humantime-serde = "1.1.1"
 serde           = { version = "1.0.136", features = ["derive"] }
 figment         = { version = "0.10.6", features = ["env"] }
 isolanguage-1   = { version = "0.2.2", features = ["serde"] }
-mongodb         = { version = "2.2.0-beta", features = ["bson-uuid-0_8"], default-features = false }
+mongodb         = { version = "2.3.0-beta", features = ["bson-uuid-0_8"], default-features = false }
 
 # Dependencies for bin `fake-data`
 rand = { version = "0.8.5", optional = true }
