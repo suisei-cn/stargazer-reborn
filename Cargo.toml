@@ -9,4 +9,5 @@ members = [
   "middlewares/translate",
   "workers/bililive",
   "workers/twitter",
+  "bots/telegram",
 ]
