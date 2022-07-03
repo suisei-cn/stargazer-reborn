@@ -1,26 +1,21 @@
 #![allow(clippy::unused_async)]
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use axum::{extract::Extension, Router};
 use color_eyre::Result;
-use futures::{future::try_join, TryStreamExt};
 use http::Method;
-use mongodb::{
-    bson::{doc, Uuid},
-    Database,
-};
+use mongodb::{bson::Uuid, Database};
 use tower_http::{cors, trace};
 
 use sg_auth::{Permission, PermissionSet};
-use sg_core::models::{Entity, EventFilter, Task, User};
 
 use crate::{
     model::{GetInterest, Health, Interest, Login, Null, UserQuery},
     rpc::{
         model::{
             AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
-            Entities, GetEntities, NewToken, Token, UpdateEntity, UpdateSetting,
+            GetEntities, NewToken, Token, UpdateEntity, UpdateSetting,
         },
         ApiError, ApiResult,
     },
@@ -66,13 +61,26 @@ pub async fn make_app_with(config: Config, db: Option<Database>) -> Result<Route
                  avatar,
                  name,
              },
-             ctx| { ctx.add_user(im, im_payload, avatar, name) },
+             ctx: Context| {
+                async move { ctx.add_user(im, im_payload, avatar, name).await }
+            },
         )
-        .mount(|AddEntity { meta, tasks }, ctx| ctx.add_entity(meta, tasks))
-        .mount(|req: AddTask, ctx| ctx.add_task(&req.entity_id, req.into()))
-        .mount(|DelEntity { entity_id }, ctx| ctx.del_entity(&entity_id))
-        .mount(|DelTask { task_id }, ctx| ctx.del_task(&task_id))
-        .mount(|UpdateEntity { entity_id, meta }, ctx| ctx.update_entity(&entity_id, &meta))
+        .mount(|AddEntity { meta, tasks }, ctx: Context| async move {
+            ctx.add_entity(meta, tasks).await
+        })
+        .mount(|req: AddTask, ctx: Context| async move {
+            let id = req.entity_id;
+            ctx.add_task(&id, req.into()).await
+        })
+        .mount(
+            |DelEntity { entity_id }, ctx: Context| async move { ctx.del_entity(&entity_id).await },
+        )
+        .mount(|DelTask { task_id }, ctx: Context| async move { ctx.del_task(&task_id).await })
+        .mount(
+            |UpdateEntity { entity_id, meta }, ctx: Context| async move {
+                ctx.update_entity(&entity_id, &meta).await
+            },
+        )
         .layer(admin_guard)
         .mount(
             |GetInterest {
@@ -80,17 +88,17 @@ pub async fn make_app_with(config: Config, db: Option<Database>) -> Result<Route
                  kind,
                  im,
              },
-             ctx| async {
+             ctx: Context| async move {
                 ctx.get_interest(entity_id, &kind, &im)
                     .await
                     .map(|users| Interest { users })
             },
         )
-        .mount(|GetEntities {}, ctx| ctx.get_entities())
+        .mount(|GetEntities {}, ctx: Context| async move { ctx.get_entities().await })
         .mount(new_token)
-        .mount(|DelUser { query }, ctx| ctx.del_user(&query))
+        .mount(|DelUser { query }, ctx: Context| async move { ctx.del_user(&query).await })
         .layer(bot_guard)
-        .mount(|UpdateSetting { event_filter }, ctx| async {
+        .mount(|UpdateSetting { event_filter }, ctx: Context| async move {
             let id = ctx.assert_user_claims()?.id();
             ctx.update_setting(&id, &event_filter).await
         })
