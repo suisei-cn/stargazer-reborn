@@ -15,7 +15,7 @@ use url::Url;
 use sg_auth::AuthClient;
 use sg_core::models::{Entity, EventFilter, Group, Meta, Task, User};
 
-use crate::model::{Entities, GetEntities};
+use crate::model::Entities;
 use crate::{
     model::{AddTaskParam, Bot, UserQuery},
     rpc::{ApiError, ApiResult},
