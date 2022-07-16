@@ -1,4 +1,16 @@
 pull_request_rules:
+  - name: Automatic approve
+    conditions:
+      - author=dependabot[bot]
+      - check-success=Lint
+      - check-success=Test
+      - or:
+          - label=minor
+          - label=patch
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving dependabot
   - name: Automatic merge
     conditions:
       - author=dependabot[bot]
