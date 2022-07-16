@@ -12,6 +12,7 @@ pub use worker::{start_worker, DBConfig, NodeConfig, Worker};
 mod compression;
 mod ident;
 mod resolver;
+mod ring;
 mod runtime;
 #[cfg(test)]
 mod tests;
