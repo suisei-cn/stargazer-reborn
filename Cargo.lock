@@ -430,6 +430,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite",
  "tracing",
+ "uuid 0.8.2",
  "webpki",
 ]
 
