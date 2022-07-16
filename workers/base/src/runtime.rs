@@ -11,8 +11,8 @@ use foca::{BincodeCodec, Config, Foca, NoCustomBroadcast, Notification, Runtime,
 use futures::StreamExt;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio::sync::{broadcast, oneshot};
 use tracing::{debug, error, info, warn};
 
 use sg_core::utils::ScopedJoinHandle;
@@ -88,7 +88,7 @@ impl DerefMut for FocaSender {
 /// Tokio-based Foca runtime.
 pub struct TokioFocaRuntime<Sink> {
     tx_foca: FocaSender,
-    tx_notify: UnboundedSender<Notification<ID>>,
+    tx_notify: broadcast::Sender<Notification<ID>>,
     sink: Sink,
 }
 
@@ -153,8 +153,7 @@ pub struct TokioFocaCtl {
     /// Sender to foca task.
     tx_foca: FocaSender,
     /// Receiver from foca task.
-    rx_notify: UnboundedReceiver<Notification<ID>>,
-    // TODO change to broadcast or something else
+    tx_notify: broadcast::Sender<Notification<ID>>,
     /// RAII handle for spawned tasks.
     _handle: (ScopedJoinHandle<()>, ScopedJoinHandle<()>),
 }
@@ -166,10 +165,12 @@ impl TokioFocaCtl {
             .send(Input::Announce(id))
             .expect("Foca is dead");
     }
-    /// Receive notifications from the runtime.
-    pub async fn recv(&mut self) -> Option<Notification<ID>> {
-        // TODO can be changed to broadcast or something else?
-        self.rx_notify.recv().await
+    /// Subscribe to notifications.
+    ///
+    /// Note that notifications received prior to subscription are not available.
+    /// You may obtain current member list by [`TokioFocaCtl::with`].
+    pub async fn recv(&self) -> broadcast::Receiver<Notification<ID>> {
+        self.tx_notify.subscribe()
     }
     /// Execute a closure on foca instance.
     pub async fn with<F, O>(&self, f: F) -> Box<O>
@@ -205,12 +206,12 @@ pub fn start_foca(
     // Channels for inter-task communication.
     let (tx_foca, mut rx_foca) = unbounded_channel();
     let tx_foca = FocaSender(tx_foca);
-    let (tx_notify, rx_notify) = unbounded_channel();
+    let (tx_notify, _) = broadcast::channel(1024);
 
     // Instantiate runtime proxy.
     let mut foca_rt = TokioFocaRuntime {
         tx_foca: tx_foca.clone(),
-        tx_notify,
+        tx_notify: tx_notify.clone(),
         sink,
     };
 
@@ -249,6 +250,6 @@ pub fn start_foca(
     TokioFocaCtl {
         _handle: (foca_handle, income_handle),
         tx_foca,
-        rx_notify,
+        tx_notify,
     }
 }
