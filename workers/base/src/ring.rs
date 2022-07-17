@@ -1,6 +1,10 @@
-use std::collections::HashMap;
-use std::hash::{BuildHasher, Hash, Hasher};
-use std::ops::{Deref, RangeInclusive};
+//! Consistent hashing ring.
+
+use std::{
+    collections::HashMap,
+    hash::{BuildHasher, Hash, Hasher},
+    ops::{Deref, RangeInclusive},
+};
 
 use consistent_hash_ring::{migrated_ranges, Ring as RawRing, RingBuilder};
 use fnv::FnvBuildHasher;
@@ -127,8 +131,9 @@ where
     /// i.e. if there's no node in the ring, returns `None`.
     pub fn insert_key(&mut self, key: Key) -> Option<&Node> {
         let hash = self.hash(&key);
+        let rtn = self.ring.try_get(&key);
         self.keys.insert(key, hash);
-        self.ring.try_get(hash)
+        rtn
     }
 
     /// Remove a key from the ring.
@@ -137,9 +142,7 @@ where
     /// i.e. if there's no node in the ring or the key doesn't exist, returns
     /// `None`.
     pub fn remove_key(&mut self, key: &Key) -> Option<&Node> {
-        self.keys
-            .remove(key)
-            .and_then(|hash| self.ring.try_get(hash))
+        self.keys.remove(key).and_then(|_| self.ring.try_get(key))
     }
 
     /// Returns keys that are in the ring.
@@ -203,11 +206,14 @@ pub mod tests {
 
     impl TestRing {
         pub fn insert_node(&mut self, node: Node) {
-            if self.buckets.is_empty() {
-                self.buckets.insert(node, self.keys.clone());
-            } else {
-                self.buckets.insert(node, HashSet::new());
-            }
+            let bucket_empty = self.buckets.is_empty();
+            self.buckets.entry(node).or_insert_with(|| {
+                if bucket_empty {
+                    self.keys.clone()
+                } else {
+                    HashSet::new()
+                }
+            });
 
             let migration = self
                 .ring
@@ -233,7 +239,7 @@ pub mod tests {
                 .collect();
             self.merge_migration(migration);
 
-            self.buckets.remove(&node).unwrap().is_empty();
+            self.buckets.remove(&node);
 
             Self::assert(
                 self.buckets.keys().copied(),
@@ -245,15 +251,19 @@ pub mod tests {
         pub fn insert_key(&mut self, key: Key) {
             self.keys.insert(key);
             let rtn = self.ring.insert_key(key).copied();
-            Self::assert_single(self.buckets.keys().copied(), key, rtn);
             if let Some(node) = rtn {
                 self.buckets.get_mut(&node).unwrap().insert(key);
             }
+            Self::assert_single(self.buckets.keys().copied(), key, rtn);
         }
 
         pub fn remove_key(&mut self, key: Key) {
             let rtn = self.ring.remove_key(&key).copied();
-            Self::assert_single(self.buckets.keys().copied(), key, rtn);
+            if self.keys.remove(&key) {
+                Self::assert_single(self.buckets.keys().copied(), key, rtn);
+            } else {
+                assert!(rtn.is_none());
+            }
             if let Some(node) = rtn {
                 self.buckets.get_mut(&node).unwrap().remove(&key);
             }
@@ -262,6 +272,14 @@ pub mod tests {
         fn merge_migration(&mut self, migration: Vec<Migrated<Node, Key>>) {
             for migrated in migration {
                 for key in migrated.keys() {
+                    if option_env!("FUZZ_TRACE").is_some() {
+                        eprintln!(
+                            "[*] {:?}: {:?} -> {:?}",
+                            key,
+                            migrated.src(),
+                            migrated.dst()
+                        );
+                    }
                     self.buckets.get_mut(migrated.src()).unwrap().remove(key);
                     self.buckets.get_mut(migrated.dst()).unwrap().insert(*key);
                 }
@@ -271,9 +289,18 @@ pub mod tests {
         fn assert_single(nodes: impl Iterator<Item = Node>, key: Key, actual: Option<Node>) {
             let ring = RingBuilder::default().nodes_iter(nodes).build();
             if ring.is_empty() {
-                assert!(actual.is_none());
+                assert!(
+                    actual.is_none(),
+                    "assert single: expected: None, got: {:?}",
+                    actual
+                );
             } else {
-                assert_eq!(actual, Some(*ring.get(&key)));
+                let expected = Some(*ring.get(&key));
+                assert_eq!(
+                    actual, expected,
+                    "assert single: expected {:?}, got {:?}",
+                    expected, actual
+                );
             }
         }
 
@@ -294,7 +321,11 @@ pub mod tests {
                 for key in keys {
                     expected.get_mut(ring.get(key)).unwrap().insert(key);
                 }
-                assert_eq!(&expected, actual);
+                assert_eq!(
+                    &expected, actual,
+                    "\nassert:\nexpected:{:?}\ngot:{:?}",
+                    expected, actual
+                );
             }
         }
     }
