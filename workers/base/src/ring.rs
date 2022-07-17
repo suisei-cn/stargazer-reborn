@@ -169,31 +169,32 @@ where
     }
 }
 
-#[cfg(any(test, fuzzing))]
-mod tests {
+#[cfg(any(test, feature = "fuzzing"))]
+pub mod tests {
     use std::collections::{HashMap, HashSet};
 
+    use arbitrary::Arbitrary;
     use consistent_hash_ring::RingBuilder;
 
     use crate::ring::Migrated;
 
     use super::Ring;
 
-    #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-    struct Node(u64);
+    #[derive(Arbitrary, Debug, Eq, PartialEq, Hash, Copy, Clone)]
+    pub struct Node(u8);
 
-    #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-    struct Key(u64);
+    #[derive(Arbitrary, Debug, Eq, PartialEq, Hash, Copy, Clone)]
+    pub struct Key(u8);
 
     #[derive(Default)]
-    struct TestRing {
+    pub struct TestRing {
         ring: Ring<Node, Key>,
         buckets: HashMap<Node, HashSet<Key>>,
         keys: HashSet<Key>,
     }
 
     impl TestRing {
-        fn insert_node(&mut self, node: Node) {
+        pub fn insert_node(&mut self, node: Node) {
             if self.buckets.is_empty() {
                 self.buckets.insert(node, self.keys.clone());
             } else {
@@ -214,7 +215,7 @@ mod tests {
                 &self.buckets,
             );
         }
-        fn remove_node(&mut self, node: Node) {
+        pub fn remove_node(&mut self, node: Node) {
             let migration = self
                 .ring
                 .remove_node(&node)
@@ -231,7 +232,7 @@ mod tests {
                 &self.buckets,
             );
         }
-        fn insert_key(&mut self, key: Key) {
+        pub fn insert_key(&mut self, key: Key) {
             self.keys.insert(key);
             let rtn = self.ring.insert_key(key).copied();
             Self::assert_single(self.buckets.keys().copied(), key, rtn);
@@ -239,8 +240,7 @@ mod tests {
                 self.buckets.get_mut(&node).unwrap().insert(key);
             }
         }
-        fn remove_key(&mut self, key: Key) {
-            self.keys.remove(&key);
+        pub fn remove_key(&mut self, key: Key) {
             let rtn = self.ring.remove_key(&key).copied();
             Self::assert_single(self.buckets.keys().copied(), key, rtn);
             if let Some(node) = rtn {
