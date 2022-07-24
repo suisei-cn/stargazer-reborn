@@ -10,6 +10,7 @@ pub use transport::Certificates;
 pub use worker::{start_worker, DBConfig, NodeConfig, Worker};
 
 mod compression;
+mod db;
 mod ident;
 mod resolver;
 #[cfg(not(feature = "fuzzing"))]
