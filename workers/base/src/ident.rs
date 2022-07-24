@@ -35,6 +35,9 @@ impl ID {
     pub const fn addr(&self) -> &Uri {
         &self.addr
     }
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
 }
 
 impl Debug for ID {
