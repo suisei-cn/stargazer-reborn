@@ -1,52 +1,61 @@
 //! Certificate related types that supports the secured `WebSocket` transport.
-use std::iter;
-use std::sync::Arc;
+use std::{fs::File, io, io::BufReader, path::PathBuf, sync::Arc};
 
-use rustls::server::AllowAnyAuthenticatedClient;
-use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
+use eyre::{bail, eyre, Result, WrapErr};
+use rustls::{
+    server::AllowAnyAuthenticatedClient,
+    Certificate,
+    ClientConfig,
+    PrivateKey,
+    RootCertStore,
+    ServerConfig,
+};
 use rustls_pemfile::Item;
+use serde::{de::Error, Deserialize, Deserializer};
 use tokio_rustls::{TlsAcceptor, TlsConnector};
 use tracing::{debug, warn};
 
 /// Certificates used by a client or a server.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Certificates {
     /// Trusted root certificates.
-    root_certificates: RootCertStore,
+    pub(crate) root_certificates: RootCertStore,
     /// Public certificate chain.
-    public_cert_chain: Vec<Certificate>,
+    pub(crate) public_cert_chain: Vec<Certificate>,
     /// Private key.
-    private_key: PrivateKey,
+    pub(crate) private_key: PrivateKey,
 }
 
 impl Certificates {
-    /// Create a new `Certificates` instance with given pem files.
+    /// Create a new `Certificates` instance with given PEM files.
     ///
     /// `root`: CA certificate in PEM format.
     /// `cert`: public certificate and private key in PEM format.
-    #[must_use]
-    #[allow(clippy::missing_panics_doc, clippy::cognitive_complexity)]
-    pub fn from_pem(mut root: &[u8], mut cert: &[u8]) -> Self {
+    ///
+    /// # Errors
+    /// Returns error if no certificate or key is found in given `cert` file.
+    #[allow(clippy::cognitive_complexity)]
+    pub fn from_pem(root: &mut impl io::BufRead, cert: &mut impl io::BufRead) -> Result<Self> {
         let mut root_certs = vec![];
-        for section in
-            iter::from_fn(|| rustls_pemfile::read_one(&mut root).expect("CFG: Corrupt PEM file"))
+        while let Some(section) =
+            rustls_pemfile::read_one(root).wrap_err("Corrupt root PEM file.")?
         {
             if let Item::X509Certificate(cert) = section {
                 root_certs.push(cert);
             } else {
-                warn!("Section not handled in given pem file.");
+                warn!("Section not handled in given PEM file.");
             }
         }
 
         let mut public_cert_chain = vec![];
         let mut private_key = None;
-        for section in
-            iter::from_fn(|| rustls_pemfile::read_one(&mut cert).expect("CFG: Corrupt PEM file"))
+        while let Some(section) =
+            rustls_pemfile::read_one(cert).wrap_err("Corrupt cert PEM file.")?
         {
             match section {
                 Item::X509Certificate(cert) => public_cert_chain.push(Certificate(cert)),
                 Item::PKCS8Key(key) => private_key = Some(PrivateKey(key)),
-                _ => warn!("Section not handled in given pem file."),
+                _ => warn!("Section not handled in given PEM file."),
             }
         }
 
@@ -54,11 +63,17 @@ impl Certificates {
         let (succ, _) = root_certificates.add_parsable_certificates(&root_certs);
         debug!("{} root certificates added", succ);
 
-        Self {
+        if public_cert_chain.is_empty() {
+            bail!("No public certificate found in given PEM file.");
+        }
+        let private_key =
+            private_key.ok_or_else(|| eyre!("No private key found in given PEM file."))?;
+
+        Ok(Self {
             root_certificates,
             public_cert_chain,
-            private_key: private_key.expect("CFG: missing private key"),
-        }
+            private_key,
+        })
     }
 
     /// Return a TLS acceptor configured with the given certificates.
@@ -86,4 +101,24 @@ impl Certificates {
             .expect("CFG: invalid client certificate");
         TlsConnector::from(Arc::new(client_config))
     }
+}
+
+/// Helper struct for deserializing a certificate from PEM files.
+#[derive(Debug, Deserialize)]
+struct CertificatesFromFile {
+    /// Path to the client server TLS CA PEM file.
+    ca: PathBuf,
+    /// Path to the client server TLS certificate & key PEM file.
+    cert: PathBuf,
+}
+
+/// Helper function for deserializing a certificate from PEM files.
+pub fn deserialize<'de, D>(de: D) -> Result<Certificates, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let cert_from_file = CertificatesFromFile::deserialize(de)?;
+    let mut ca = BufReader::new(File::open(cert_from_file.ca).map_err(D::Error::custom)?);
+    let mut cert = BufReader::new(File::open(cert_from_file.cert).map_err(D::Error::custom)?);
+    Certificates::from_pem(&mut ca, &mut cert).map_err(D::Error::custom)
 }

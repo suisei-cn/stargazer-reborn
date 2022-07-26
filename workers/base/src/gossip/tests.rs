@@ -50,9 +50,10 @@ pub fn cert(ca: &KeyStore, hostname: &str) -> KeyStore {
 
 pub fn certs(ca: &KeyStore, hostname: &str) -> Certificates {
     Certificates::from_pem(
-        &CA.to_pkcs8().unwrap(),
-        &cert(ca, hostname).to_pkcs8().unwrap(),
+        &mut &*CA.to_pkcs8().unwrap(),
+        &mut &*cert(ca, hostname).to_pkcs8().unwrap(),
     )
+    .unwrap()
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

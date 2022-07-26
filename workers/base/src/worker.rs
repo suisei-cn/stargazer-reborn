@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use eyre::Result;
 use futures::{pin_mut, stream, Stream, TryStreamExt};
-use tokio::net::{TcpListener, ToSocketAddrs};
+use sg_core::models::Task;
+use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::http::Uri;
 use uuid::Uuid;
 
@@ -19,31 +20,29 @@ use crate::{
 /// Start a new worker task.
 ///
 /// # Errors
-/// Returns error if failed to bind to the given address, or initial connection to database failed.
-pub async fn start_worker<A: ToSocketAddrs + Send>(
-    worker: impl Worker,
-    config: NodeConfig<A>,
-) -> Result<()> {
+/// Returns error if failed to bind to the given address, or initial connection
+/// to database failed.
+pub async fn start_worker(worker: impl Worker, config: NodeConfig) -> Result<()> {
     // Bind to the configured address and start transport layer.
-    let listener = TcpListener::bind(config.bind).await?;
-    let (stream, sink) = ws_transport(
-        listener,
-        config.certificates,
-        config.base_uri.clone(),
-        StdResolver,
-    )
-    .await;
+    let listener = TcpListener::bind(&*config.bind).await?;
+    let (stream, sink) =
+        ws_transport(listener, config.cert, config.base_uri.clone(), StdResolver).await;
 
     // Start the Foca runtime.
-    let kind = config.ident.kind().to_string();
-    let foca = start_foca(config.ident, stream, sink, None);
+    let ident = ID::new(config.base_uri.clone(), config.kind.clone());
+    let foca = start_foca(ident, stream, sink, None);
     for announce_peer in config.announce {
-        foca.announce(ID::new(announce_peer, kind.clone()));
+        foca.announce(ID::new(announce_peer, config.kind.clone()));
     }
 
     // Prepare change stream.
     let foca_stream = foca_events(&foca).await;
-    let db_stream = db_events(&config.db.uri, &config.db.db, &config.db.collection).await?;
+    let db_stream = db_events(
+        &config.mongo.uri,
+        &config.mongo.db,
+        &config.mongo.collection,
+    )
+    .await?;
     let event_stream = stream::select(foca_stream, db_stream);
     pin_mut!(event_stream);
 

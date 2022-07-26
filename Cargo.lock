@@ -415,6 +415,7 @@ dependencies = [
  "core",
  "derivative",
  "eyre",
+ "figment",
  "fnv",
  "foca",
  "futures",
@@ -3000,7 +3001,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros 2.0.0",
- "time 0.3.12",
+ "time 0.3.13",
 ]
 
 [[package]]
@@ -3330,7 +3331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d634a985c4d4238ec39cacaed2e7ae552fbd3c476b552c1deac3021b7d7eaf0c"
 dependencies = [
  "itoa",
- "js-sys",
  "libc",
  "num_threads",
  "serde",

@@ -6,5 +6,5 @@ pub mod ident;
 pub mod resolver;
 pub mod runtime;
 #[cfg(test)]
-mod tests;
+pub mod tests;
 pub mod transport;
