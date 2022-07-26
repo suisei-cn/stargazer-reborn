@@ -37,8 +37,8 @@ pub async fn start_worker<A: ToSocketAddrs + Send>(
     // Start the Foca runtime.
     let kind = config.ident.kind().to_string();
     let foca = start_foca(config.ident, stream, sink, None);
-    if let Some(announce) = config.announce {
-        foca.announce(ID::new(announce, kind));
+    for announce_peer in config.announce {
+        foca.announce(ID::new(announce_peer, kind.clone()));
     }
 
     // Prepare change stream.

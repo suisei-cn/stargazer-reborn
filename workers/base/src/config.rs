@@ -6,11 +6,10 @@ use crate::{Certificates, ID};
 
 /// Configuration for worker nodes.
 pub struct NodeConfig<A> {
-    // TODO this can be a list.
     /// A peer URL to announce to the rest of the cluster.
     ///
     /// This is optional. If not set, the worker will be started at idle state.
-    pub announce: Option<Uri>,
+    pub announce: Vec<Uri>,
     /// Socket address to bind to for gossip protocol.
     pub bind: A,
     /// URI of this node to announce to the rest of the cluster.
