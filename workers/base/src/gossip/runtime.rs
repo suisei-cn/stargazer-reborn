@@ -9,17 +9,18 @@ use bincode::DefaultOptions;
 use derivative::Derivative;
 use foca::{BincodeCodec, Config, Foca, NoCustomBroadcast, Notification, Runtime, Timer};
 use futures::StreamExt;
-use rand::prelude::StdRng;
-use rand::SeedableRng;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio::sync::{broadcast, oneshot};
+use rand::prelude::{SeedableRng, StdRng};
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedSender},
+    {broadcast, oneshot},
+};
 use tracing::{debug, error, info, warn};
 
 use sg_core::utils::ScopedJoinHandle;
 
-use crate::compression::{compress, decompress};
-use crate::ident::ID;
-use crate::transport::{GossipSink, GossipStream};
+use super::compression::{compress, decompress};
+use super::ident::ID;
+use super::transport::{GossipSink, GossipStream};
 
 /// Foca type instantiated with crate-specific type parameters.
 type ConcreteFoca = Foca<ID, BincodeCodec<DefaultOptions>, StdRng, NoCustomBroadcast>;

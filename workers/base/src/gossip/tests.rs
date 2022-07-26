@@ -15,10 +15,10 @@ use tokio_tungstenite::tungstenite::http::Uri;
 
 use sg_core::utils::ScopedJoinHandle;
 
-use crate::ident::ID;
-use crate::resolver::MockResolver;
-use crate::runtime::start_foca;
-use crate::transport::{ws_transport, Certificates};
+use super::ident::ID;
+use super::resolver::MockResolver;
+use super::runtime::start_foca;
+use super::transport::{ws_transport, Certificates};
 
 pub static CA: Lazy<KeyStore> = Lazy::new(ca);
 

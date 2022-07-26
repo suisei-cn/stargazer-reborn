@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-fuzzing = ["arbitrary"]
-
 [dependencies]
 arbitrary = { version = "1.1", features = ["derive"], optional = true }
 async-trait = "0.1"
@@ -23,7 +20,7 @@ rand = "0.8"
 rustls = "0.20"
 rustls-pemfile = "1.0"
 serde = "1.0"
-serde_with = "1.14"
+serde_with = "2.0"
 sg-core = { package = "core", path = "../../core" }
 tap = "1.0"
 tokio = { version = "1.20", features = ["sync", "time", "rt"] }
