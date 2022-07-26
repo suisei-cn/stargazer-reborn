@@ -14,7 +14,7 @@ use tokio_tungstenite::WebSocketStream;
 pub use certificate::Certificates;
 pub use websocket::ws_transport;
 
-mod certificate;
+pub mod certificate;
 #[cfg(test)]
 mod tests;
 mod websocket;

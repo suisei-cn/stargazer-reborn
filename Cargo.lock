@@ -413,6 +413,7 @@ dependencies = [
  "core",
  "derivative",
  "eyre",
+ "figment",
  "fnv",
  "foca",
  "futures",
