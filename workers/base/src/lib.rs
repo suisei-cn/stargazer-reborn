@@ -1,24 +1,21 @@
-//! Support library for all workers. Mainly contains gossip protocol for auto discovery.
+//! Support library for all workers.
+//!
+//! Contains gossip protocol for auto discovery.
 #![allow(
     clippy::module_name_repetitions,
     clippy::default_trait_access,
     clippy::cast_possible_truncation
 )]
+#![warn(missing_docs)]
 
-pub use ident::ID;
-pub use transport::Certificates;
-pub use worker::{start_worker, DBConfig, NodeConfig, Worker};
+pub use common::Worker;
+pub use config::{DBConfig, NodeConfig};
+pub use gossip::{Certificates, ID};
+pub use worker::start_worker;
 
-mod compression;
-mod db;
-mod ident;
-mod resolver;
-#[cfg(not(feature = "fuzzing"))]
-mod ring;
-#[cfg(feature = "fuzzing")]
+mod change_events;
+mod common;
+mod config;
+mod gossip;
 pub mod ring;
-mod runtime;
-#[cfg(test)]
-mod tests;
-mod transport;
 mod worker;

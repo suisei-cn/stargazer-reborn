@@ -1,24 +1,29 @@
-use std::collections::{HashMap, HashSet};
-use std::iter;
-use std::net::{IpAddr, SocketAddr};
-use std::num::{NonZeroU8, NonZeroUsize};
-use std::ops::Add;
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    iter,
+    net::{IpAddr, SocketAddr},
+    num::{NonZeroU8, NonZeroUsize},
+    ops::Add,
+    time::{Duration, SystemTime},
+};
 
 use foca::Config;
 use once_cell::sync::Lazy;
 use pki::{CertName, CertUsage, CertificateBuilder, KeyStore, PrivateKey};
-use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::sleep;
+use sg_core::utils::ScopedJoinHandle;
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, oneshot},
+    time::sleep,
+};
 use tokio_tungstenite::tungstenite::http::Uri;
 
-use sg_core::utils::ScopedJoinHandle;
-
-use crate::ident::ID;
-use crate::resolver::MockResolver;
-use crate::runtime::start_foca;
-use crate::transport::{ws_transport, Certificates};
+use super::{
+    ident::ID,
+    resolver::MockResolver,
+    runtime::start_foca,
+    transport::{ws_transport, Certificates},
+};
 
 pub static CA: Lazy<KeyStore> = Lazy::new(ca);
 

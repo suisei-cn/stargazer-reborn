@@ -1,25 +1,30 @@
 //! Foca runtime for tokio.
 
-use std::any::Any;
-use std::num::NonZeroU32;
-use std::ops::{Deref, DerefMut};
-use std::time::Duration;
+use std::{
+    any::Any,
+    num::NonZeroU32,
+    ops::{Deref, DerefMut},
+    time::Duration,
+};
 
 use bincode::DefaultOptions;
 use derivative::Derivative;
 use foca::{BincodeCodec, Config, Foca, NoCustomBroadcast, Notification, Runtime, Timer};
 use futures::StreamExt;
-use rand::prelude::StdRng;
-use rand::SeedableRng;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio::sync::{broadcast, oneshot};
+use rand::prelude::{SeedableRng, StdRng};
+use sg_core::utils::ScopedJoinHandle;
+use tokio::sync::{
+    broadcast,
+    mpsc::{unbounded_channel, UnboundedSender},
+    oneshot,
+};
 use tracing::{debug, error, info, warn};
 
-use sg_core::utils::ScopedJoinHandle;
-
-use crate::compression::{compress, decompress};
-use crate::ident::ID;
-use crate::transport::{GossipSink, GossipStream};
+use super::{
+    compression::{compress, decompress},
+    ident::ID,
+    transport::{GossipSink, GossipStream},
+};
 
 /// Foca type instantiated with crate-specific type parameters.
 type ConcreteFoca = Foca<ID, BincodeCodec<DefaultOptions>, StdRng, NoCustomBroadcast>;
@@ -54,6 +59,7 @@ impl FocaSender {
             })))
             .expect("Foca is dead");
     }
+
     pub async fn with<F, O>(&self, f: F) -> Box<O>
     where
         F: FnOnce(&mut ConcreteFoca) -> O + Send + 'static,
@@ -165,13 +171,16 @@ impl TokioFocaCtl {
             .send(Input::Announce(id))
             .expect("Foca is dead");
     }
+
     /// Subscribe to notifications.
     ///
-    /// Note that notifications received prior to subscription are not available.
-    /// You may obtain current member list by [`TokioFocaCtl::with`].
+    /// Note that notifications received prior to subscription are not
+    /// available. You may obtain current member list by
+    /// [`TokioFocaCtl::with`].
     pub async fn recv(&self) -> broadcast::Receiver<Notification<ID>> {
         self.tx_notify.subscribe()
     }
+
     /// Execute a closure on foca instance.
     pub async fn with<F, O>(&self, f: F) -> Box<O>
     where

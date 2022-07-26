@@ -1,7 +1,9 @@
 //! DNS resolver implementations.
 
-use std::io;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::{
+    io,
+    net::{SocketAddr, ToSocketAddrs},
+};
 
 /// A DNS resolver resolves a hostname to a list of addresses.
 pub trait DNSResolver: Send + Sync + Clone + 'static {

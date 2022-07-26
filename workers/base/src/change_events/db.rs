@@ -1,25 +1,29 @@
-//! Database access.
-
+//! Database provider.
 use std::collections::HashMap;
 
 use eyre::Result;
 use futures::{future, stream, Stream, StreamExt, TryStreamExt};
-use mongodb::bson::oid::ObjectId;
-use mongodb::change_stream::event::{ChangeStreamEvent, OperationType};
-use mongodb::options::{ChangeStreamOptions, FullDocumentType};
-use mongodb::{bson, Client, Collection};
+use mongodb::{
+    bson,
+    bson::oid::ObjectId,
+    change_stream::event::{ChangeStreamEvent, OperationType},
+    options::{ChangeStreamOptions, FullDocumentType},
+    Client,
+    Collection,
+};
+use sg_core::models::{InDB, Task};
 use tracing::{error, info, info_span, instrument};
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
-use sg_core::models::{InDB, Task};
-
-use crate::worker::Event;
+use crate::common::Event;
 
 type TaskCollection = Collection<InDB<Task>>;
+type ChangeEvent = ChangeStreamEvent<InDB<Task>>;
 
+/// Load existing tasks from the database.
 #[instrument]
-async fn populate_existing_tasks(
+async fn fetch_existing_tasks(
     coll: &TaskCollection,
 ) -> Result<(HashMap<ObjectId, Uuid>, Vec<Task>)> {
     let tasks = coll.find(None, None).await?;
@@ -39,8 +43,8 @@ async fn populate_existing_tasks(
     Ok((oid_map, tasks))
 }
 
-type ChangeEvent = ChangeStreamEvent<InDB<Task>>;
-
+/// Convert db change events to task events.
+#[allow(clippy::cognitive_complexity)]
 fn match_event(event: ChangeEvent, oid_map: &mut HashMap<ObjectId, Uuid>) -> Vec<Event> {
     match event.operation_type {
         OperationType::Insert => {
@@ -82,14 +86,16 @@ fn match_event(event: ChangeEvent, oid_map: &mut HashMap<ObjectId, Uuid>) -> Vec
                 bson::from_document(event.document_key.expect("DocumentKey must be available"))
                     .expect("_id must be available");
 
-            if let Some(id) = oid_map.remove(&task.id()) {
-                info!(task_id = %id, "Task removed");
-
-                vec![Event::TaskRemove(id)]
-            } else {
-                error!("Task not found in oid map: {:?}.", task.id());
-                vec![]
-            }
+            oid_map.remove(&task.id()).map_or_else(
+                || {
+                    error!("Task not found in oid map: {:?}.", task.id());
+                    vec![]
+                },
+                |id| {
+                    info!(task_id = %id, "Task removed");
+                    vec![Event::TaskRemove(id)]
+                },
+            )
         }
         OperationType::Invalidate => {
             error!("Change stream invalidated.");
@@ -102,6 +108,9 @@ fn match_event(event: ChangeEvent, oid_map: &mut HashMap<ObjectId, Uuid>) -> Vec
     }
 }
 
+/// Change stream from database.
+///
+/// Provides tasks changes.
 pub async fn db_events(
     uri: &str,
     db: &str,
@@ -112,7 +121,7 @@ pub async fn db_events(
     let collection = db.collection(coll);
 
     info!("Loading existing tasks from database");
-    let (mut oid_map, initial_tasks) = populate_existing_tasks(&collection).await?;
+    let (mut oid_map, initial_tasks) = fetch_existing_tasks(&collection).await?;
 
     info!("Start watching database for task changes");
     let stream = collection

@@ -14,7 +14,6 @@ libfuzzer-sys = "0.4"
 
 [dependencies.base]
 path = ".."
-features = ["fuzzing"]
 
 # Prevent this from interfering with workspaces
 [workspace]

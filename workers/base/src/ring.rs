@@ -9,64 +9,6 @@ use std::{
 use consistent_hash_ring::{migrated_ranges, Ring as RawRing, RingBuilder};
 use fnv::FnvBuildHasher;
 
-enum LightCow<'a, T> {
-    Borrowed(&'a T),
-    Owned(T),
-}
-
-impl<'a, T> Deref for LightCow<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            LightCow::Borrowed(t) => *t,
-            LightCow::Owned(t) => t,
-        }
-    }
-}
-
-/// A collection that has been migrated to another node.
-pub struct Migrated<'a, Node, Key, Hasher = FnvBuildHasher> {
-    src: Node,
-    dst: Node,
-    migrated_keys: RangeInclusive<u64>,
-    keys: LightCow<'a, HashMap<Key, u64, Hasher>>,
-}
-
-impl<'a, Node, Key, Hasher> Migrated<'a, Node, Key, Hasher>
-where
-    Node: Clone,
-    Key: Eq + Hash + Clone,
-    Hasher: BuildHasher + Default,
-{
-    pub fn to_owned(&self) -> Migrated<'static, Node, Key, Hasher> {
-        Migrated {
-            src: self.src.clone(),
-            dst: self.dst.clone(),
-            migrated_keys: self.migrated_keys.clone(),
-            keys: LightCow::Owned(self.keys.iter().map(|(k, v)| (k.clone(), *v)).collect()),
-        }
-    }
-}
-
-impl<'a, Node, Key, Hasher> Migrated<'a, Node, Key, Hasher> {
-    /// The source node this hash range maps to.
-    pub const fn src(&self) -> &Node {
-        &self.src
-    }
-    /// The destination node this hash range maps to.
-    pub const fn dst(&self) -> &Node {
-        &self.dst
-    }
-    /// Keys that was migrated.
-    pub fn keys(&'a self) -> impl Iterator<Item = &'a Key> {
-        self.keys
-            .iter()
-            .filter(|(_, hash)| self.migrated_keys.contains(hash))
-            .map(|(key, _)| key)
-    }
-}
-
 /// A consistent hash ring.
 pub struct Ring<Node, Key, Hasher = FnvBuildHasher> {
     ring: RawRing<Node, Hasher>,
@@ -177,6 +119,67 @@ where
         let mut digest = self.hasher.build_hasher();
         key.hash(&mut digest);
         digest.finish()
+    }
+}
+
+/// A collection that has been migrated to another node.
+pub struct Migrated<'a, Node, Key, Hasher = FnvBuildHasher> {
+    src: Node,
+    dst: Node,
+    migrated_keys: RangeInclusive<u64>,
+    keys: LightCow<'a, HashMap<Key, u64, Hasher>>,
+}
+
+impl<'a, Node, Key, Hasher> Migrated<'a, Node, Key, Hasher>
+where
+    Node: Clone,
+    Key: Eq + Hash + Clone,
+    Hasher: BuildHasher + Default,
+{
+    /// Creates owned data from borrowed data.
+    pub fn to_owned(&self) -> Migrated<'static, Node, Key, Hasher> {
+        Migrated {
+            src: self.src.clone(),
+            dst: self.dst.clone(),
+            migrated_keys: self.migrated_keys.clone(),
+            keys: LightCow::Owned(self.keys.iter().map(|(k, v)| (k.clone(), *v)).collect()),
+        }
+    }
+}
+
+impl<'a, Node, Key, Hasher> Migrated<'a, Node, Key, Hasher> {
+    /// The source node this hash range maps to.
+    pub const fn src(&self) -> &Node {
+        &self.src
+    }
+
+    /// The destination node this hash range maps to.
+    pub const fn dst(&self) -> &Node {
+        &self.dst
+    }
+
+    /// Keys that was migrated.
+    pub fn keys(&'a self) -> impl Iterator<Item = &'a Key> {
+        self.keys
+            .iter()
+            .filter(|(_, hash)| self.migrated_keys.contains(hash))
+            .map(|(key, _)| key)
+    }
+}
+
+enum LightCow<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
+impl<'a, T> Deref for LightCow<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            LightCow::Borrowed(t) => *t,
+            LightCow::Owned(t) => t,
+        }
     }
 }
 

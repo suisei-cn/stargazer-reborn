@@ -24,6 +24,7 @@ pub struct ID {
 }
 
 impl ID {
+    /// Create a new ID.
     pub fn new(addr: Uri, kind: String) -> Self {
         Self {
             version: 0,
@@ -32,9 +33,13 @@ impl ID {
             extra: random(),
         }
     }
+
+    /// Get the address.
     pub const fn addr(&self) -> &Uri {
         &self.addr
     }
+
+    /// Get the kind.
     pub fn kind(&self) -> &str {
         &self.kind
     }

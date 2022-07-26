@@ -3,105 +3,28 @@
 use std::collections::HashMap;
 
 use eyre::Result;
-use foca::Notification;
-use futures::StreamExt;
 use futures::{pin_mut, stream, Stream, TryStreamExt};
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tokio_stream::wrappers::BroadcastStream;
 use tokio_tungstenite::tungstenite::http::Uri;
-use tracing::{debug, error};
 use uuid::Uuid;
 
-use sg_core::models::Task;
+use crate::{
+    change_events::{db::db_events, gossip::foca_events},
+    common::{Event, Worker, WorkerLogExt},
+    config::NodeConfig,
+    gossip::{ident::ID, resolver::StdResolver, runtime::start_foca, transport::ws_transport},
+    ring::{Migrated, Ring},
+};
 
-use crate::db::db_events;
-use crate::resolver::StdResolver;
-use crate::ring::{Migrated, Ring};
-use crate::runtime::{start_foca, TokioFocaCtl};
-use crate::transport::ws_transport;
-use crate::{Certificates, ID};
-
-pub enum Event {
-    NodeUp(Uri),
-    NodeDown(Uri),
-    TaskAdd(Task),
-    TaskRemove(Uuid),
-}
-
-pub trait Worker {
-    // TODO &self or &mut self?
-    fn add_task(&self, task: Task) -> bool;
-    fn remove_task(&self, id: Uuid) -> bool;
-}
-
-trait WorkerLogExt {
-    fn add_task_logged(&self, task: Task);
-    fn remove_task_logged(&self, id: Uuid);
-}
-
-impl<W: Worker> WorkerLogExt for W {
-    fn add_task_logged(&self, task: Task) {
-        let task_id = task.id;
-        if self.add_task(task) {
-            debug!(%task_id, "Task added.");
-        } else {
-            error!(%task_id, "Task already exists.");
-        }
-    }
-
-    fn remove_task_logged(&self, id: Uuid) {
-        if self.remove_task(id) {
-            debug!(task_id = %id, "Task removed.");
-        } else {
-            error!(task_id = %id, "Task does not exist.");
-        }
-    }
-}
-
-pub struct NodeConfig<A> {
-    announce: Option<Uri>,
-    bind: A,
-    base_uri: Uri,
-    certificates: Certificates,
-    ident: ID,
-    db: DBConfig,
-}
-
-pub struct DBConfig {
-    uri: String,
-    name: String,
-    collection: String,
-}
-
-pub async fn foca_events(foca: &TokioFocaCtl) -> Result<impl Stream<Item = Result<Event>>> {
-    let rx_foca = foca.recv().await;
-    let nodes: Vec<_> = *foca
-        .with(|foca| {
-            foca.iter_members()
-                .map(|member| member.addr().clone())
-                .collect()
-        })
-        .await;
-    Ok(
-        stream::iter(nodes.into_iter().map(|node| Ok(Event::NodeUp(node)))).chain(
-            BroadcastStream::new(rx_foca)
-                .try_filter_map(|notification| async move {
-                    Ok(match notification {
-                        Notification::MemberUp(id) => Some(Event::NodeUp(id.addr().clone())),
-                        Notification::MemberDown(id) => Some(Event::NodeDown(id.addr().clone())),
-                        _ => None,
-                    })
-                })
-                .map_err(|e| e.into()),
-        ),
-    )
-}
-
-pub async fn start_worker<A: ToSocketAddrs>(
+/// Start a new worker task.
+///
+/// # Errors
+/// Returns error if failed to bind to the given address, or initial connection to database failed.
+pub async fn start_worker<A: ToSocketAddrs + Send>(
     worker: impl Worker,
     config: NodeConfig<A>,
 ) -> Result<()> {
-    let kind = config.ident.kind().to_string();
+    // Bind to the configured address and start transport layer.
     let listener = TcpListener::bind(config.bind).await?;
     let (stream, sink) = ws_transport(
         listener,
@@ -110,31 +33,41 @@ pub async fn start_worker<A: ToSocketAddrs>(
         StdResolver,
     )
     .await;
+
+    // Start the Foca runtime.
+    let kind = config.ident.kind().to_string();
     let foca = start_foca(config.ident, stream, sink, None);
     if let Some(announce) = config.announce {
         foca.announce(ID::new(announce, kind));
     }
 
-    let foca_stream = foca_events(&foca).await?;
-    let db_stream = db_events(&config.db.uri, &config.db.name, &config.db.collection).await?;
+    // Prepare change stream.
+    let foca_stream = foca_events(&foca).await;
+    let db_stream = db_events(&config.db.uri, &config.db.db, &config.db.collection).await?;
     let event_stream = stream::select(foca_stream, db_stream);
     pin_mut!(event_stream);
 
+    // Main loop.
     let this_node = config.base_uri;
-
     worker_task(worker, event_stream, this_node).await
 }
 
+/// Main worker task logic.
 async fn worker_task(
     worker: impl Worker,
-    mut event_stream: impl Stream<Item = Result<Event>> + Unpin,
+    mut event_stream: impl Stream<Item = Result<Event>> + Send + Unpin,
     this_node: Uri,
 ) -> Result<()> {
+    // Prepare consistent hash ring.
     let mut ring: Ring<Uri, Uuid> = Ring::default();
+    // Only IDs are stored in hash ring so we need to maintain an ID-to-Task
+    // mapping.
     let mut id_task_map: HashMap<Uuid, Task> = HashMap::new();
+
     if let Some(event) = event_stream.try_next().await? {
         match event {
             Event::NodeUp(node) => {
+                // A node has joined the cluster.
                 if ring.is_empty() {
                     // Special case: add all existing tasks to the worker.
                     for task in id_task_map.values() {
@@ -146,18 +79,23 @@ async fn worker_task(
                 }
             }
             Event::NodeDown(node) => {
+                // A node has left the cluster.
                 let migrations = ring.remove_node(&node);
                 merge_migrations(&*migrations, &id_task_map, &this_node, &worker);
             }
             Event::TaskAdd(task) => {
+                // A new task has been added.
                 id_task_map.insert(task.id.into(), task.clone());
                 if ring.insert_key(task.id.into()) == Some(&this_node) {
+                    // The added task is assigned to this node, add it to the worker.
                     worker.add_task_logged(task);
                 }
             }
             Event::TaskRemove(id) => {
+                // A task has been removed.
                 id_task_map.remove(&id);
                 if ring.remove_key(&id) == Some(&this_node) {
+                    // The removed task belongs to this node, remove it from the worker.
                     worker.remove_task_logged(id);
                 }
             }
@@ -166,24 +104,27 @@ async fn worker_task(
     Ok(())
 }
 
+/// Merge related part of cluster member migrations into the worker.
 fn merge_migrations(
     migrations: &[Migrated<Uri, Uuid>],
     id_task_map: &HashMap<Uuid, Task>,
     this_node: &Uri,
     worker: &impl Worker,
 ) {
+    // Remove tasks that have been migrated from this node.
     migrations
         .iter()
         .find(|migration| migration.src() == this_node)
-        .map(|removed| removed.keys())
+        .map(Migrated::keys)
         .into_iter()
         .flatten()
         .for_each(|task_to_remove| worker.remove_task_logged(*task_to_remove));
 
+    // Add tasks that have been migrated to this node.
     migrations
         .iter()
         .find(|migration| migration.dst() == this_node)
-        .map(|added| added.keys())
+        .map(Migrated::keys)
         .into_iter()
         .flatten()
         .map(|id| {
