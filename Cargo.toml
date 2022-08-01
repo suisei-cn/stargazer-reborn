@@ -7,6 +7,7 @@ members = [
   "core",
   "middlewares/delay",
   "middlewares/translate",
+  "workers/base",
   "workers/bililive",
   "workers/twitter",
 ]

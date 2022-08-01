@@ -14,6 +14,7 @@ This project is licensed under MIT License - see the [LICENSE](LICENSE) file for
 
 ## Architecture
 
-**Note: this is subject to change during development process.** For up-to-date graph, see [arch.drawio](arch.drawio).
+**Note: this is subject to change during development process.**
+For up-to-date graph, see [arch.drawio](doc/src/arch.drawio).
 
-![2022-03-25T14:04:34Z.png](https://imagedelivery.net/b21oeeg7p6hqWEI-IA5xDw/885a0e1b-5bcc-41d8-cc1b-45a7c4f6d700/public)
+![arch](doc/src/arch.svg)
