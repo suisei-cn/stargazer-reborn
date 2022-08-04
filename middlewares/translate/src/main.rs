@@ -4,6 +4,7 @@ use tracing::error;
 use tracing_subscriber::EnvFilter;
 
 use sg_core::mq::{MessageQueue, RabbitMQ};
+use sg_core::utils::FigmentExt;
 
 use crate::config::Config;
 use crate::translate::{BaiduTranslator, MockTranslator, Translator};
@@ -18,7 +19,8 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let config = Config::from_env().wrap_err("Failed to load config from environment variables")?;
+    let config = Config::from_env("MIDDLEWARE_")
+        .wrap_err("Failed to load config from environment variables")?;
 
     let translator: Box<dyn Translator> = if config.debug {
         Box::new(MockTranslator)

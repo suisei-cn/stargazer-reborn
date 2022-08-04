@@ -1,53 +1,42 @@
 //! Translate middleware config.
 
-use eyre::Result;
-use figment::providers::{Env, Serialized};
-use figment::Figment;
 use serde::{Deserialize, Serialize};
 
+use sg_core::utils::Config;
+
 /// Coordinator config.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Config)]
 pub struct Config {
     /// AMQP connection url.
+    #[config(default_str = "amqp://guest:guest@localhost:5672")]
     pub amqp_url: String,
     /// AMQP exchange name.
+    #[config(default_str = "stargazer-reborn")]
     pub amqp_exchange: String,
     /// Database connection url.
+    #[config(default_str = "db.sqlite")]
     pub database_url: String,
-}
-
-impl Config {
-    /// Load config from environment variables.
-    ///
-    /// # Errors
-    /// Returns error if part of the config is invalid.
-    pub fn from_env() -> Result<Self> {
-        Ok(Figment::from(Serialized::defaults(Self::default()))
-            .merge(Env::prefixed("MIDDLEWARE_"))
-            .extract()?)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            amqp_url: String::from("amqp://guest:guest@localhost:5672"),
-            amqp_exchange: String::from("stargazer-reborn"),
-            database_url: "db.sqlite".to_string(),
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use figment::Jail;
 
+    use sg_core::utils::FigmentExt;
+
     use crate::config::Config;
 
     #[test]
     fn must_default() {
         Jail::expect_with(|_| {
-            assert_eq!(Config::from_env().unwrap(), Config::default());
+            assert_eq!(
+                Config::from_env("MIDDLEWARE_").unwrap(),
+                Config {
+                    amqp_url: String::from("amqp://guest:guest@localhost:5672"),
+                    amqp_exchange: String::from("stargazer-reborn"),
+                    database_url: "db.sqlite".to_string(),
+                }
+            );
             Ok(())
         });
     }
@@ -62,7 +51,7 @@ mod tests {
                 "mysql://guest:guest@localhost/test",
             );
             assert_eq!(
-                Config::from_env().unwrap(),
+                Config::from_env("MIDDLEWARE_").unwrap(),
                 Config {
                     amqp_url: String::from("amqp://admin:admin@localhost:5672"),
                     amqp_exchange: String::from("some_exchange"),

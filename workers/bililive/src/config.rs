@@ -1,45 +1,25 @@
 //! Twitter worker config.
 
-use eyre::Result;
-use figment::providers::{Env, Serialized};
-use figment::Figment;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use sg_core::utils::Config;
+
 /// Coordinator config.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Config)]
 pub struct Config {
     /// Unique worker ID.
+    #[config(default)]
     pub id: Uuid,
     /// AMQP connection url.
+    #[config(default_str = "amqp://guest:guest@localhost:5672")]
     pub amqp_url: String,
     /// AMQP exchange name.
+    #[config(default_str = "stargazer-reborn")]
     pub amqp_exchange: String,
     /// The coordinator url to connect to.
+    #[config(default_str = "ws://127.0.0.1:7000")]
     pub coordinator_url: String,
-}
-
-impl Config {
-    /// Load config from environment variables.
-    ///
-    /// # Errors
-    /// Returns error if part of the config is invalid.
-    pub fn from_env() -> Result<Self> {
-        Ok(Figment::from(Serialized::defaults(Self::default()))
-            .merge(Env::prefixed("WORKER_"))
-            .extract()?)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            id: Uuid::nil(),
-            amqp_url: String::from("amqp://guest:guest@localhost:5672"),
-            amqp_exchange: String::from("stargazer-reborn"),
-            coordinator_url: String::from("ws://127.0.0.1:7000"),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -47,12 +27,22 @@ mod tests {
     use figment::Jail;
     use uuid::Uuid;
 
+    use sg_core::utils::FigmentExt;
+
     use crate::config::Config;
 
     #[test]
     fn must_default() {
         Jail::expect_with(|_| {
-            assert_eq!(Config::from_env().unwrap(), Config::default());
+            assert_eq!(
+                Config::from_env("WORKER_").unwrap(),
+                Config {
+                    id: Uuid::nil(),
+                    amqp_url: String::from("amqp://guest:guest@localhost:5672"),
+                    amqp_exchange: String::from("stargazer-reborn"),
+                    coordinator_url: String::from("ws://127.0.0.1:7000"),
+                }
+            );
             Ok(())
         });
     }
@@ -66,7 +56,7 @@ mod tests {
             jail.set_env("WORKER_AMQP_EXCHANGE", "some_exchange");
             jail.set_env("WORKER_COORDINATOR_URL", "ws://localhost:8080");
             assert_eq!(
-                Config::from_env().unwrap(),
+                Config::from_env("WORKER_").unwrap(),
                 Config {
                     id,
                     amqp_url: String::from("amqp://admin:admin@localhost:5672"),
