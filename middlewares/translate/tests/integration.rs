@@ -50,6 +50,8 @@ async fn must_translate_and_put_back() {
         .unwrap()
         .env("MIDDLEWARE_AMQP_URL", "amqp://guest:guest@localhost:5672")
         .env("MIDDLEWARE_AMQP_EXCHANGE", &exchange_name)
+        .env("MIDDLEWARE_BAIDU_APP_ID", "0")
+        .env("MIDDLEWARE_BAIDU_APP_SECRET", "")
         .env("MIDDLEWARE_DEBUG", "true")
         .spawn()
         .unwrap();

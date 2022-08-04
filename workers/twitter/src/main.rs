@@ -8,6 +8,7 @@ use tracing_subscriber::EnvFilter;
 
 use sg_core::mq::RabbitMQ;
 use sg_core::protocol::WorkerRpcExt;
+use sg_core::utils::FigmentExt;
 
 use crate::config::Config;
 use crate::worker::TwitterWorker;
@@ -23,7 +24,8 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let config = Config::from_env().wrap_err("Failed to load config from environment variables")?;
+    let config =
+        Config::from_env("WORKER_").wrap_err("Failed to load config from environment variables")?;
 
     let mq = RabbitMQ::new(&config.amqp_url, &config.amqp_exchange)
         .await
