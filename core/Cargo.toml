@@ -7,10 +7,13 @@ edition = "2021"
 [features]
 mq = ["lapin", "tokio-reactor-trait", "tokio-executor-trait"]
 mock = ["tokio/sync", "tokio-stream/sync"]
+config = ["figment", "core_derive"]
 
 [dependencies]
 async-trait = "0.1"
+core_derive = { path = "../core_derive", optional = true }
 eyre = "0.6"
+figment = { version = "0.10", features = ["env"], optional = true }
 futures-util = { version = "0.3", features = ["sink"] }
 isolanguage-1 = { version = "0.2", features = ["serde"] }
 itertools = "0.10"
@@ -31,5 +34,8 @@ url = { version = "2.2.2", features = ["serde"] }
 uuid = "0.8"
 
 [dev-dependencies]
+core_derive = { path = "../core_derive" }
+figment = { version = "0.10", features = ["env", "test"] }
+humantime-serde = "1.1"
 tokio = { version = "1.20", features = ["rt", "time", "net", "sync"] }
 tokio-stream = { version = "0.1", features = ["sync"] }

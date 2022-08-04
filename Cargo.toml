@@ -5,6 +5,7 @@ members = [
   "auth",
   "coordinator",
   "core",
+  "core_derive",
   "middlewares/delay",
   "middlewares/translate",
   "workers/bililive",
