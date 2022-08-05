@@ -1,5 +1,0 @@
-error: Cannot set both `default` and `inherit`
- --> tests/ui/default_inherit.rs:5:30
-  |
-5 |     #[config(default = "10", inherit)]
-  |                              ^^^^^^^
