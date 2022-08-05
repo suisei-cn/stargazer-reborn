@@ -4,8 +4,8 @@ use darling::ast::Data;
 use darling::util::{Ignored, Override, SpannedValue};
 use darling::{Error, FromDeriveInput, FromField};
 use quote::{quote, ToTokens};
+use syn::Ident;
 use syn::{parse_macro_input, DeriveInput, Path, Type};
-use syn::{Expr, Ident};
 
 fn default_core_crate() -> Path {
     syn::parse_str("sg_core").expect("a path")
@@ -24,7 +24,7 @@ struct ConfigStruct {
 #[darling(attributes(config))]
 struct ConfigField {
     ident: Option<Ident>,
-    default: Option<Override<Expr>>,
+    default: Option<Override<String>>,
     default_str: Option<SpannedValue<String>>,
     ty: Type,
 }
@@ -36,6 +36,13 @@ macro_rules! tri {
             Err(e) => return TokenStream::from(e.write_errors()),
         }
     };
+}
+
+fn value_from_json_str(core_crate: &Path, v: &str) -> proc_macro2::TokenStream {
+    quote! {
+        #core_crate::utils::serde_json::from_str::<#core_crate::utils::serde_json::Value>(#v)
+            .expect("Given string literal is not a valid json value.")
+    }
 }
 
 fn value_from_default_serialized(core_crate: &Path, ty: &Type) -> proc_macro2::TokenStream {
@@ -72,7 +79,9 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
                             .with_span(&default_str)
                             .write_errors(),
                     ),
-                    (Some(Override::Explicit(default)), _) => Some(default.to_token_stream()),
+                    (Some(Override::Explicit(default)), _) => {
+                        Some(value_from_json_str(&core_crate, &default))
+                    }
                     (Some(Override::Inherit), _) => {
                         Some(value_from_default_serialized(&core_crate, &ty))
                     }

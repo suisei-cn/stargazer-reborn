@@ -176,7 +176,9 @@ mod tests {
         #[config(default_str = "10s")]
         delay: Duration,
         #[config(default)]
-        nested: TestNested,
+        nested_a: TestNested,
+        #[config(default = r#"{"b": 1}"#)]
+        nested_b: TestNested,
     }
 
     #[derive(Serialize, Deserialize, Default)]
@@ -191,14 +193,32 @@ mod tests {
             jail.set_env("TEST_KIND", "test");
             jail.set_env("TEST_AGE", "42");
             jail.set_env("TEST_ENABLED", "true");
-            jail.set_env("TEST_A", "false");
+            jail.set_env("TEST_NESTED_A__A", "false");
+            jail.set_env("TEST_NESTED_B__A", "true");
+
             let config = TestConfig::from_env("TEST_").unwrap();
-            assert_eq!(config.kind, "test");
-            assert_eq!(config.age, 42);
-            assert!(config.enabled);
-            assert_eq!(config.delay, Duration::from_secs(10));
-            assert!(!config.nested.a);
-            assert_eq!(config.nested.b, 0);
+
+            let TestConfig {
+                kind,
+                age,
+                enabled,
+                delay,
+                nested_a,
+                nested_b,
+            } = config;
+            assert_eq!(kind, "test");
+            assert_eq!(age, 42);
+            assert!(enabled);
+            assert_eq!(delay, Duration::from_secs(10));
+
+            let TestNested { a, b } = nested_a;
+            assert!(!a);
+            assert_eq!(b, 0);
+
+            let TestNested { a, b } = nested_b;
+            assert!(a);
+            assert_eq!(b, 1);
+
             Ok(())
         });
     }
