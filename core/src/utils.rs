@@ -383,4 +383,55 @@ mod tests {
             Ok(())
         });
     }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithInheritAndExplicitDefaults {
+        #[config(inherit, default = r#"{ "b": true }"#)]
+        a: Nested,
+    }
+
+    #[test]
+    fn must_config_with_inherit_and_explicit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A__C", "42");
+
+            let config = ConfigWithInheritAndExplicitDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithInheritAndExplicitDefaults { a: Nested { b, c } } = config;
+            assert!(b);
+            assert_eq!(c, 42);
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithFlattenInheritDefaults {
+        d: usize,
+        #[serde(flatten)]
+        #[config(inherit(flatten))]
+        a: Nested,
+    }
+
+    #[test]
+    fn must_config_with_flatten_inherit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_C", "41");
+            jail.set_env("TEST_D", "42");
+
+            let config = ConfigWithFlattenInheritDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithFlattenInheritDefaults {
+                d,
+                a: Nested { b, c },
+            } = config;
+            assert!(!b);
+            assert_eq!(c, 41);
+            assert_eq!(d, 42);
+
+            Ok(())
+        });
+    }
 }
