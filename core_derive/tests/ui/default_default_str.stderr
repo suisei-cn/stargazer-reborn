@@ -1,5 +1,5 @@
-error: Cannot set both default and default_str
- --> tests/ui/duplicate_default.rs:5:30
+error: Cannot set both `default` and `default_str`
+ --> tests/ui/default_default_str.rs:5:30
   |
 5 |     #[config(default = "10", default_str = "10")]
   |                              ^^^^^^^^^^^

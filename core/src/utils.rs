@@ -64,6 +64,7 @@ mod figment_ext {
     /// To set default values for config fields, use the `default` attribute.
     ///
     /// ```
+    /// use std::time::Duration;
     /// use serde::{Deserialize, Serialize};
     /// use core_derive::Config;
     ///
@@ -80,15 +81,29 @@ mod figment_ext {
     ///     // Without `default_str`, you must write `#[config(default = "\"foo\"")]`.
     ///     #[config(default_str = "foo")]
     ///     field: String,
-    ///     // Note: Types annotated with `#[config(default)]` must implement `Serialize`.
+    ///     // Types annotated with `#[config(default)]` must implement `Serialize`.
     ///     #[config(default)]
+    ///     delay: Duration,
+    ///     // Default values are inherited from derived `Config` of given struct.
+    ///     #[config(inherit)]
+    ///     nested: Nested,
+    ///     // Partial default assignments are allowed,
+    ///     // as long as given values are valid json literals.
+    ///     #[config(default = r#"{ "a": 42 }"#)]
+    ///     nested_2: Nested
+    /// }
+    ///
+    /// #[derive(Deserialize, Config)]
+    /// struct Nested {
+    ///     #[config(default = "42")]
+    ///     answer: usize,
     ///     nested: Nested
     /// }
     ///
-    /// #[derive(Deserialize, Serialize, Default)]
-    /// struct Nested {
-    ///     #[config(default)]
-    ///     random_field: usize
+    /// #[derive(Deserialize)]
+    /// struct DeepNested {
+    ///     a: usize,
+    ///     b: usize
     /// }
     /// ```
     pub trait FigmentExt {
@@ -133,7 +148,7 @@ mod tests {
     use std::time::Duration;
 
     use figment::Jail;
-    use serde::{Deserialize, Serialize};
+    use serde::Deserialize;
     use tokio::task::yield_now;
     use tokio::time::sleep;
 
@@ -167,57 +182,203 @@ mod tests {
 
     #[derive(Deserialize, Config)]
     #[config(core = "crate")]
-    struct TestConfig {
-        kind: String,
-        #[config(default = "10")]
-        age: usize,
-        enabled: bool,
-        #[serde(with = "humantime_serde")]
-        #[config(default_str = "10s")]
-        delay: Duration,
-        #[config(default)]
-        nested_a: TestNested,
-        #[config(default = r#"{"b": 1}"#)]
-        nested_b: TestNested,
-    }
-
-    #[derive(Serialize, Deserialize, Default)]
-    struct TestNested {
-        a: bool,
+    struct ConfigWithNoDefaults {
+        a: String,
         b: usize,
     }
 
     #[test]
-    fn must_from_env() {
+    fn must_config_with_no_defaults() {
         Jail::expect_with(|jail| {
-            jail.set_env("TEST_KIND", "test");
-            jail.set_env("TEST_AGE", "42");
-            jail.set_env("TEST_ENABLED", "true");
-            jail.set_env("TEST_NESTED_A__A", "false");
-            jail.set_env("TEST_NESTED_B__A", "true");
+            jail.set_env("TEST_A", "test");
+            jail.set_env("TEST_B", "42");
 
-            let config = TestConfig::from_env("TEST_").unwrap();
+            let config = ConfigWithNoDefaults::from_env("TEST_").unwrap();
 
-            let TestConfig {
-                kind,
-                age,
-                enabled,
-                delay,
-                nested_a,
-                nested_b,
-            } = config;
-            assert_eq!(kind, "test");
-            assert_eq!(age, 42);
-            assert!(enabled);
-            assert_eq!(delay, Duration::from_secs(10));
+            let ConfigWithNoDefaults { a, b } = config;
+            assert_eq!(a, "test");
+            assert_eq!(b, 42);
 
-            let TestNested { a, b } = nested_a;
-            assert!(!a);
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithExplicitDefaults {
+        a: String,
+        #[config(default = "42")]
+        b: usize,
+    }
+
+    #[test]
+    fn must_config_with_explicit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A", "test");
+
+            let config = ConfigWithExplicitDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithExplicitDefaults { a, b } = config;
+            assert_eq!(a, "test");
+            assert_eq!(b, 42);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn must_override_config_with_explicit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A", "test");
+            jail.set_env("TEST_B", "0");
+
+            let config = ConfigWithExplicitDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithExplicitDefaults { a, b } = config;
+            assert_eq!(a, "test");
             assert_eq!(b, 0);
 
-            let TestNested { a, b } = nested_b;
-            assert!(a);
-            assert_eq!(b, 1);
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithStrDefaults {
+        #[config(default_str = "test")]
+        a: String,
+        b: usize,
+    }
+
+    #[test]
+    fn must_config_with_str_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_B", "42");
+
+            let config = ConfigWithStrDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithStrDefaults { a, b } = config;
+            assert_eq!(a, "test");
+            assert_eq!(b, 42);
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithCustomDeserialize {
+        #[serde(with = "humantime_serde")]
+        #[config(default_str = "10s")]
+        delay: Duration,
+    }
+
+    #[test]
+    fn must_config_with_custom_defaults() {
+        Jail::expect_with(|_| {
+            let config = ConfigWithCustomDeserialize::from_env("TEST_").unwrap();
+
+            let ConfigWithCustomDeserialize { delay } = config;
+            assert_eq!(delay, Duration::from_secs(10));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn must_override_config_with_custom_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_DELAY", "1s");
+
+            let config = ConfigWithCustomDeserialize::from_env("TEST_").unwrap();
+
+            let ConfigWithCustomDeserialize { delay } = config;
+            assert_eq!(delay, Duration::from_secs(1));
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithImplicitDefaults {
+        #[config(default)]
+        a: usize,
+    }
+
+    #[test]
+    fn must_config_with_implicit_defaults() {
+        Jail::expect_with(|_| {
+            let config = ConfigWithImplicitDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithImplicitDefaults { a } = config;
+            assert_eq!(a, 0);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn must_override_config_with_implicit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A", "42");
+
+            let config = ConfigWithImplicitDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithImplicitDefaults { a } = config;
+            assert_eq!(a, 42);
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct Nested {
+        #[config(default = "false")]
+        b: bool,
+        c: usize,
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithStructDefaults {
+        #[config(default = r#"{ "c": 42 }"#)]
+        a: Nested,
+    }
+
+    #[test]
+    fn must_config_with_struct_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A__B", "true");
+
+            let config = ConfigWithStructDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithStructDefaults { a: Nested { b, c } } = config;
+            assert!(b);
+            assert_eq!(c, 42);
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
+    struct ConfigWithInheritDefaults {
+        #[config(inherit)]
+        a: Nested,
+    }
+
+    #[test]
+    fn must_config_with_inherit_defaults() {
+        Jail::expect_with(|jail| {
+            jail.set_env("TEST_A__C", "42");
+
+            let config = ConfigWithInheritDefaults::from_env("TEST_").unwrap();
+
+            let ConfigWithInheritDefaults { a: Nested { b, c } } = config;
+            assert!(!b);
+            assert_eq!(c, 42);
 
             Ok(())
         });

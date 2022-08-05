@@ -1,0 +1,5 @@
+error: Cannot set both `default_str` and `inherit`
+ --> tests/ui/default_str_inherit.rs:5:34
+  |
+5 |     #[config(default_str = "10", inherit)]
+  |                                  ^^^^^^^
