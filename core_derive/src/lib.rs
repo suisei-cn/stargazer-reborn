@@ -2,10 +2,10 @@ use proc_macro::TokenStream;
 
 use darling::ast::Data;
 use darling::util::{Flag, Ignored, Override, SpannedValue};
-use darling::{Error, FromDeriveInput, FromField};
-use quote::{quote, ToTokens};
-use syn::Ident;
+use darling::{Error, FromDeriveInput, FromField, FromMeta};
+use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Path, Type};
+use syn::{Ident, PathSegment};
 
 fn default_core_crate() -> Path {
     syn::parse_str("sg_core").expect("a path")
@@ -26,8 +26,23 @@ struct ConfigField {
     ident: Option<Ident>,
     default: Option<Override<String>>,
     default_str: Option<SpannedValue<String>>,
-    inherit: Flag,
+    inherit: Option<SpannedValue<Override<InheritAttr>>>,
     ty: Type,
+}
+
+#[derive(Debug, FromMeta)]
+struct InheritAttr {
+    flatten: Flag,
+}
+
+trait InheritAttrExt {
+    fn is_flatten(&self) -> bool;
+}
+
+impl InheritAttrExt for Override<InheritAttr> {
+    fn is_flatten(&self) -> bool {
+        matches!(self, Override::Explicit(InheritAttr { flatten }) if flatten.is_present())
+    }
 }
 
 macro_rules! tri {
@@ -39,16 +54,36 @@ macro_rules! tri {
     };
 }
 
-fn value_from_json_str(core_crate: &Path, v: &str) -> proc_macro2::TokenStream {
+fn serde_json_crate(core_crate: Path) -> Path {
+    let Path {
+        leading_colon,
+        mut segments,
+        ..
+    } = core_crate;
+    segments.extend([
+        PathSegment::from(Ident::new("utils", proc_macro2::Span::call_site())),
+        PathSegment::from(Ident::new("serde_json", proc_macro2::Span::call_site())),
+    ]);
+    Path {
+        leading_colon,
+        segments,
+    }
+}
+
+fn value_from_str(serde_json: &Path, v: &str) -> proc_macro2::TokenStream {
+    quote! {#serde_json::Value::String(#v.to_string())}
+}
+
+fn value_from_json_str(serde_json: &Path, v: &str) -> proc_macro2::TokenStream {
     quote! {
-        #core_crate::utils::serde_json::from_str::<#core_crate::utils::serde_json::Value>(#v)
+        #serde_json::from_str::<#serde_json::Value>(#v)
             .expect("Given string literal is not a valid json value.")
     }
 }
 
-fn value_from_default_serialized(core_crate: &Path, ty: &Type) -> proc_macro2::TokenStream {
+fn value_from_default_serialized(serde_json: &Path, ty: &Type) -> proc_macro2::TokenStream {
     quote! {
-        #core_crate::utils::serde_json::to_value(<#ty as Default>::default())
+        #serde_json::to_value(<#ty as Default>::default())
             .expect("Given expression can't be serialized into a json value.")
     }
 }
@@ -56,6 +91,80 @@ fn value_from_default_serialized(core_crate: &Path, ty: &Type) -> proc_macro2::T
 fn value_from_config_trait(core_crate: &Path, ty: &Type) -> proc_macro2::TokenStream {
     quote! {
         <#ty as #core_crate::utils::ConfigDefault>::config_defaults()
+    }
+}
+
+fn action_from_default(
+    serde_json: &Path,
+    default: &Override<String>,
+    ident: &Ident,
+    ty: &Type,
+    flatten: bool,
+) -> Action {
+    let key = ident.to_string();
+    let action = Action::Append(Field {
+        key,
+        value: match default {
+            Override::Inherit => value_from_default_serialized(serde_json, ty),
+            Override::Explicit(v) => value_from_json_str(serde_json, v),
+        },
+    });
+    if flatten {
+        Action::Merge(value_from_actions(serde_json, [action]))
+    } else {
+        action
+    }
+}
+
+fn action_from_inherit(core_crate: &Path, ident: &Ident, ty: &Type, flatten: bool) -> Action {
+    let key = ident.to_string();
+    let value = value_from_config_trait(core_crate, ty);
+    if flatten {
+        Action::Merge(value)
+    } else {
+        Action::Append(Field { key, value })
+    }
+}
+
+struct Field {
+    key: String,
+    value: proc_macro2::TokenStream,
+}
+
+enum Action {
+    Append(Field),
+    Merge(proc_macro2::TokenStream),
+}
+
+fn value_from_actions(
+    serde_json: &Path,
+    actions: impl IntoIterator<Item = Action>,
+) -> proc_macro2::TokenStream {
+    let stmts: Vec<_> = actions
+        .into_iter()
+        .map(|action| match action {
+            Action::Append(field) => {
+                let Field { key, value } = field;
+                quote! {dict.insert(#key.to_string(), #value);}
+            }
+            Action::Merge(value) => {
+                quote! {
+                    if let #serde_json::Value::Object(map) = #value {
+                        dict.extend(map);
+                    } else {
+                        panic!("Invariant not hold: #value.config_defaults must be an object.");
+                    }
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        {
+            let mut dict = #serde_json::Map::new();
+            #(#stmts)*
+            #serde_json::Value::Object(dict)
+        }
     }
 }
 
@@ -67,13 +176,14 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let input = tri!(ConfigStruct::from_derive_input(&input));
     let core_crate = input.core;
-    let (idents, exprs): (Vec<_>, Vec<_>) = input
+    let serde_json = serde_json_crate(core_crate.clone());
+    let actions: Vec<_> = input
         .data
         .take_struct()
         .expect("a struct")
         .fields
         .into_iter()
-        .filter_map(
+        .flat_map(
             |ConfigField {
                  ident,
                  default,
@@ -81,56 +191,63 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
                  inherit,
                  ty,
              }| {
-                let is_inherit = inherit.is_present();
-                let default = match (default, default_str, is_inherit) {
-                    (Some(_), Some(default_str), _) => Some(
-                        Error::custom("Cannot set both `default` and `default_str`")
+                let ident = ident.expect("a named field");
+                let key = ident.to_string();
+                match (default, default_str, inherit) {
+                    (Some(_), Some(default_str), _) => vec![Action::Append(Field {
+                        key,
+                        value: Error::custom("Cannot set both `default` and `default_str`")
                             .with_span(&default_str)
                             .write_errors(),
-                    ),
-                    (Some(_), None, true) => Some(
-                        Error::custom("Cannot set both `default` and `inherit`")
+                    })],
+                    (_, Some(_), Some(inherit)) => vec![Action::Append(Field {
+                        key,
+                        value: Error::custom("Cannot set both `default_str` and `inherit`")
                             .with_span(&inherit)
                             .write_errors(),
-                    ),
-                    (None, Some(_), true) => Some(
-                        Error::custom("Cannot set both `default_str` and `inherit`")
-                            .with_span(&inherit)
-                            .write_errors(),
-                    ),
-                    // Only `default` is present and has an explicit value.
-                    (Some(Override::Explicit(default)), _, false) => {
-                        Some(value_from_json_str(&core_crate, &default))
-                    }
-                    // Only `default` is present and has an implicit value.
-                    (Some(Override::Inherit), _, false) => {
-                        Some(value_from_default_serialized(&core_crate, &ty))
-                    }
+                    })],
                     // Only `default_str` is present.
-                    (_, Some(default_str), false) => Some(default_str.to_token_stream()),
+                    (None, Some(default_str), None) => vec![Action::Append(Field {
+                        key,
+                        value: value_from_str(&serde_json, &*default_str),
+                    })],
+                    // Only `default` is present.
+                    (Some(default), None, None) => {
+                        vec![action_from_default(
+                            &serde_json,
+                            &default,
+                            &ident,
+                            &ty,
+                            false,
+                        )]
+                    }
+                    // Both `inherit` and `default` are present.
+                    (Some(default), None, Some(inherit)) => {
+                        let flatten = inherit.is_flatten();
+                        vec![
+                            action_from_inherit(&core_crate, &ident, &ty, flatten),
+                            action_from_default(&serde_json, &default, &ident, &ty, flatten),
+                        ]
+                    }
                     // Only `inherit` is present.
-                    (None, None, true) => Some(value_from_config_trait(&core_crate, &ty)),
+                    (None, None, Some(inherit)) => {
+                        let flatten = inherit.is_flatten();
+                        vec![action_from_inherit(&core_crate, &ident, &ty, flatten)]
+                    }
                     // No attributes are present.
-                    (None, None, false) => None,
-                };
-                Some((ident.expect("a named field").to_string(), default?))
+                    (None, None, None) => vec![],
+                }
             },
         )
-        .unzip();
+        .collect();
 
-    let json_expr = quote! {
-        #core_crate::utils::serde_json::json!({
-            #(
-                #idents: #exprs
-            ),*
-        })
-    };
+    let value = value_from_actions(&serde_json, actions);
 
     let struct_ident = input.ident;
     let tokens = quote! {
         impl #core_crate::utils::ConfigDefault for #struct_ident {
             fn config_defaults() -> #core_crate::utils::serde_json::Value {
-                #json_expr
+                #value
             }
         }
     };
