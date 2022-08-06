@@ -65,7 +65,7 @@ mod figment_ext {
     ///
     /// ```
     /// use std::time::Duration;
-    /// use serde::{Deserialize, Serialize};
+    /// use serde::Deserialize;
     /// use core_derive::Config;
     ///
     /// // Override crate name for core crate if its name is not `sg_core`.
@@ -84,28 +84,51 @@ mod figment_ext {
     ///     // Types annotated with `#[config(default)]` must implement `Serialize`.
     ///     #[config(default)]
     ///     delay: Duration,
-    ///     // Default values are inherited from derived `Config` of given struct.
-    ///     #[config(inherit)]
-    ///     nested: Nested,
     ///     // Partial default assignments are allowed,
     ///     // as long as given values are valid json literals.
     ///     #[config(default = r#"{ "a": 42 }"#)]
-    ///     nested_2: Nested
+    ///     nested: Nested
+    /// }
+    ///
+    /// #[derive(Deserialize)]
+    /// struct Nested {
+    ///     a: usize,
+    ///     b: usize
+    /// }
+    /// ```
+    /// # Inherit default values from nested field
+    /// To inherit default config values from nested field, use the `inherit` attribute.
+    ///
+    /// ```rust
+    /// use std::time::Duration;
+    /// use serde::Deserialize;
+    /// use core_derive::Config;
+    ///
+    /// // Override crate name for core crate if its name is not `sg_core`.
+    /// // E.g. `#[config(core = "crate_name")]`
+    /// #[derive(Deserialize, Config)]
+    /// # #[config(core = "crate")]
+    /// struct Config {
+    ///     // Default values are inherited from derived `Config` of given struct.
+    ///     #[config(inherit)]
+    ///     nested: Nested,
+    ///     // Partial default assignments take precedence over inherited values.
+    ///     #[config(inherit, default = r#"{ "answer": 114514 }"#)]
+    ///     nested_2: Nested,
+    ///     // `inherit(flatten)` can be used in combination with `serde(flatten)`.
+    ///     #[serde(flatten)]
+    ///     #[config(inherit(flatten))]
+    ///     flatten: Nested
     /// }
     ///
     /// #[derive(Deserialize, Config)]
     /// struct Nested {
     ///     #[config(default = "42")]
     ///     answer: usize,
-    ///     nested: Nested
-    /// }
-    ///
-    /// #[derive(Deserialize)]
-    /// struct DeepNested {
-    ///     a: usize,
-    ///     b: usize
+    ///     age: Nested
     /// }
     /// ```
+    ///
     pub trait FigmentExt {
         /// Load config from environment variables.
         ///
