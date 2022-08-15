@@ -2,6 +2,7 @@ pull_request_rules:
   - name: Automatic approve
     conditions:
       - author=dependabot[bot]
+      - check-success=Fmt
       - check-success=Lint
       - check-success=Test
       - or:

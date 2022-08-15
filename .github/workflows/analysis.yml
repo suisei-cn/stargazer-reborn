@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout 🛎️
-      - run: rustup show
+      - run: rustup update && rustup show
         name: Setup Cargo Toolchain 🛎️
       - uses: Swatinem/rust-cache@v1
       - run: cargo install --locked clippy-sarif
