@@ -6,23 +6,27 @@ extern crate diesel_migrations;
 use std::sync::Arc;
 
 use chrono::NaiveDateTime;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
-use eyre::Result;
-use eyre::{Context, ContextCompat};
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    SqliteConnection,
+};
+use eyre::{Context, ContextCompat, Result};
 use futures_util::StreamExt;
+use sg_core::{
+    models::Event,
+    mq::{MessageQueue, Middlewares, RabbitMQ},
+    utils::FigmentExt,
+};
 use tap::Pipe;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-use sg_core::models::Event;
-use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
-use sg_core::utils::FigmentExt;
-
-use crate::config::Config;
-use crate::db::DelayedMessage;
-use crate::scheduler::Scheduler;
-use crate::schema::delayed_messages::dsl::delayed_messages;
+use crate::{
+    config::Config,
+    db::DelayedMessage,
+    scheduler::Scheduler,
+    schema::delayed_messages::dsl::delayed_messages,
+};
 
 mod config;
 mod db;

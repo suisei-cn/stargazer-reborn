@@ -1,26 +1,28 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
-use std::net::UdpSocket;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    net::UdpSocket,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use educe::Educe;
 use eyre::Result;
-use mongodb::bson::doc;
-use mongodb::{Client, Collection};
+use mongodb::{bson::doc, Client, Collection};
+use sg_core::{
+    models::Task,
+    protocol::{WorkerRpc, WorkerRpcExt},
+    utils::ScopedJoinHandle,
+};
 use tarpc::context::Context;
-use tokio::sync::oneshot::{channel, Sender};
-use tokio::task::JoinHandle;
-use tokio::time::{sleep, timeout};
+use tokio::{
+    sync::oneshot::{channel, Sender},
+    task::JoinHandle,
+    time::{sleep, timeout},
+};
 use uuid::Uuid;
 
-use sg_core::models::Task;
-use sg_core::protocol::{WorkerRpc, WorkerRpcExt};
-use sg_core::utils::ScopedJoinHandle;
-
-use crate::config::Config;
-use crate::db::DB;
-use crate::App;
+use crate::{config::Config, db::DB, App};
 
 #[derive(Clone, Educe)]
 #[educe(Hash, Eq, PartialEq)]
@@ -43,6 +45,7 @@ impl DummyWorker {
             tasks: Default::default(),
         }
     }
+
     pub async fn join_remote(self) -> Result<()> {
         self.clone().join(self.ws, self.id, self.kind).await
     }
@@ -53,6 +56,7 @@ impl WorkerRpc for DummyWorker {
     async fn ping(self, _: Context, id: u64) -> u64 {
         id
     }
+
     async fn add_task(self, _: Context, task: Task) -> bool {
         self.tasks
             .lock()
@@ -60,9 +64,11 @@ impl WorkerRpc for DummyWorker {
             .insert(task.id.into(), task)
             .is_none()
     }
+
     async fn remove_task(self, _: Context, id: Uuid) -> bool {
         self.tasks.lock().unwrap().remove(&id).is_some()
     }
+
     async fn tasks(self, _: Context) -> Vec<Task> {
         self.tasks.lock().unwrap().values().cloned().collect()
     }
@@ -145,6 +151,7 @@ impl Tester {
         let mut client_side: HashMap<String, HashMap<Uuid, Uuid>> = HashMap::new();
         for (kind, workers) in &self.clients {
             for worker in workers.keys() {
+                #[allow(clippy::significant_drop_in_scrutinee)]
                 for task in worker.tasks.lock().unwrap().values() {
                     client_side
                         .entry(kind.clone())

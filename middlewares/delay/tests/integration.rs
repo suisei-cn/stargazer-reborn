@@ -1,15 +1,18 @@
-use std::process::Command;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    process::Command,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use assert_cmd::cargo::CommandCargoExt;
 use futures_util::StreamExt;
 use rstest::rstest;
 use serde_json::{json, Value};
+use sg_core::{
+    models::Event,
+    mq::{MessageQueue, Middlewares, RabbitMQ},
+};
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
-
-use sg_core::models::Event;
-use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
 #[rstest]
 #[case(json ! ({"a": "b"}), json ! ({"a": "b"}))]
@@ -56,9 +59,11 @@ async fn must_delay_and_send(#[case] mut event: Value, #[case] expected_event: V
     assert!(delta < Duration::from_millis(1500));
 
     // There must be only one message.
-    assert!(timeout(Duration::from_secs(1), consumer.next())
-        .await
-        .is_err());
+    assert!(
+        timeout(Duration::from_secs(1), consumer.next())
+            .await
+            .is_err()
+    );
 
     // Shutdown the middleware.
     program.kill().unwrap();
@@ -159,9 +164,11 @@ async fn must_reschedule(#[case] earlier_than_now: bool) {
     assert!(delta < Duration::from_millis(1500));
 
     // There must be only one message.
-    assert!(timeout(Duration::from_secs(4), consumer.next())
-        .await
-        .is_err());
+    assert!(
+        timeout(Duration::from_secs(4), consumer.next())
+            .await
+            .is_err()
+    );
 
     // Shutdown the middleware.
     program.kill().unwrap();
@@ -218,9 +225,11 @@ async fn must_cancel(#[case] mut event: Value) {
         .unwrap();
 
     // Should not receive any message.
-    assert!(timeout(Duration::from_secs(6), consumer.next())
-        .await
-        .is_err());
+    assert!(
+        timeout(Duration::from_secs(6), consumer.next())
+            .await
+            .is_err()
+    );
 
     // Shutdown the middleware.
     program.kill().unwrap();
@@ -300,9 +309,11 @@ async fn must_delay_and_send_across_restart() {
     assert!(delta < Duration::from_millis(1500));
 
     // There must be only one message.
-    assert!(timeout(Duration::from_millis(500), consumer.next())
-        .await
-        .is_err());
+    assert!(
+        timeout(Duration::from_millis(500), consumer.next())
+            .await
+            .is_err()
+    );
 
     // Shutdown the middleware.
     program.kill().unwrap();

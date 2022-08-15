@@ -67,7 +67,8 @@ use futures::StreamExt;
 use mongodb::{bson::doc, Collection};
 use rand::{
     prelude::{SliceRandom, ThreadRng},
-    thread_rng, Rng,
+    thread_rng,
+    Rng,
 };
 use sg_core::models::{Entity, EventFilter, Meta, Name, User};
 use tokio::time::Instant;
@@ -92,7 +93,7 @@ fn gen_user(event_filter: EventFilter) -> User {
         id: id.into(),
         name: FakeName().fake(),
         event_filter,
-        avatar: "http://placekitten.com/114/514".parse().ok(),
+        avatar: "https://placekitten.com/114/514".parse().ok(),
         im: ["tg", "qq"].choose(&mut rng).unwrap().to_owned().to_owned(),
         im_payload: Faker.fake(),
     }

@@ -1,14 +1,10 @@
 #![allow(clippy::module_name_repetitions)]
 
 use eyre::{Result, WrapErr};
+use sg_core::{mq::RabbitMQ, protocol::WorkerRpcExt, utils::FigmentExt};
 use tracing_subscriber::EnvFilter;
 
-use sg_core::mq::RabbitMQ;
-use sg_core::protocol::WorkerRpcExt;
-use sg_core::utils::FigmentExt;
-
-use crate::config::Config;
-use crate::worker::BililiveWorker;
+use crate::{config::Config, worker::BililiveWorker};
 
 mod bililive;
 mod config;

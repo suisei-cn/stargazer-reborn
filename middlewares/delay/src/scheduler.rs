@@ -1,20 +1,28 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Weak},
+};
 
 use chrono::Utc;
-use diesel::associations::HasTable;
-use diesel::dsl::now;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{
+    associations::HasTable,
+    dsl::now,
+    r2d2::{ConnectionManager, Pool},
+    ExpressionMethods,
+    QueryDsl,
+    RunQueryDsl,
+    SqliteConnection,
+};
 use parking_lot::Mutex;
+use sg_core::{mq::MessageQueue, utils::ScopedJoinHandle};
 use tokio::time::sleep;
 use tracing::{error, info};
 
-use sg_core::mq::MessageQueue;
-use sg_core::utils::ScopedJoinHandle;
-
-use crate::schema::delayed_messages::{deliver_at, id};
-use crate::{delayed_messages, DelayedMessage};
+use crate::{
+    delayed_messages,
+    schema::delayed_messages::{deliver_at, id},
+    DelayedMessage,
+};
 
 pub struct Scheduler {
     pool: Pool<ConnectionManager<SqliteConnection>>,
@@ -68,6 +76,7 @@ impl Scheduler {
             delayed_messages: Mutex::new(HashMap::new()),
         }
     }
+
     #[allow(clippy::cognitive_complexity)]
     pub fn add_task(self: &Arc<Self>, msg: DelayedMessage, persist: bool) {
         if msg.deliver_at <= Utc::now().naive_utc() {
@@ -104,6 +113,7 @@ impl Scheduler {
             info!(id = %msg_id, "Added delayed message");
         }
     }
+
     pub fn remove_task(&self, task_id: i64) {
         if self.delayed_messages.lock().remove(&task_id).is_some() {
             let conn = self.pool.get().expect("No db conn available");
@@ -120,6 +130,7 @@ impl Scheduler {
             info!(id = %task_id, "No delayed message to remove");
         }
     }
+
     pub fn load(self: &Arc<Self>) {
         let conn = self.pool.get().expect("No db conn available");
         let results = delayed_messages.load::<DelayedMessage>(&conn);
@@ -134,6 +145,7 @@ impl Scheduler {
             }
         }
     }
+
     pub fn cleanup(&self) {
         let conn = self.pool.get().expect("No db conn available");
         let r = diesel::delete(delayed_messages::table())
@@ -155,14 +167,17 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::Utc;
-    use diesel::r2d2::{ConnectionManager, Pool};
-    use diesel::{RunQueryDsl, SqliteConnection};
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        RunQueryDsl,
+        SqliteConnection,
+    };
+    use sg_core::{
+        models::Event,
+        mq::{mock::MockMQ, Middlewares},
+    };
     use tokio::time::sleep;
     use uuid::Uuid;
-
-    use sg_core::models::Event;
-    use sg_core::mq::mock::MockMQ;
-    use sg_core::mq::Middlewares;
 
     use crate::{delayed_messages, embedded_migrations, DelayedMessage, Scheduler};
 
@@ -206,7 +221,11 @@ mod tests {
                 114_514,
                 Middlewares::default(),
                 Event::from_serializable("", Uuid::nil(), ()).unwrap(),
-                Utc::now().naive_utc() + chrono::Duration::milliseconds(500), // Deliver the message later so it may be added to the queue.
+                Utc::now().naive_utc() + chrono::Duration::milliseconds(500), /* Deliver the
+                                                                               * message later
+                                                                               * so it may be
+                                                                               * added to the
+                                                                               * queue. */
             );
             scheduler.add_task(msg, true);
             assert_eq!(

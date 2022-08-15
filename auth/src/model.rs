@@ -32,7 +32,7 @@ pub struct PermissionSet {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mq: Option<Permission>,
 
-    /// Cooridinator access
+    /// Coordinator access
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coordinator: Option<Permission>,
 }

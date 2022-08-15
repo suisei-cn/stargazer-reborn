@@ -3,9 +3,8 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 use sg_core::utils::Config;
+use uuid::Uuid;
 
 /// Coordinator config.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Config)]
@@ -35,9 +34,8 @@ mod tests {
     use std::time::Duration;
 
     use figment::Jail;
-    use uuid::Uuid;
-
     use sg_core::utils::FigmentExt;
+    use uuid::Uuid;
 
     use crate::config::Config;
 

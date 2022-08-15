@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::{model::UserQuery, rpc::Response};
 
 #[cfg_attr(
-    feature = "server",
-    doc = r##"
+feature = "server",
+doc = r##"
 Represents an API Error.
 
 # Examples
@@ -114,9 +114,9 @@ impl ApiError {
     /// Throw multiple error explanation at once.
     #[inline]
     pub fn tirade<I, S>(mut self, error: I) -> Self
-    where
-        S: Into<String>,
-        I: IntoIterator<Item = S>,
+        where
+            S: Into<String>,
+            I: IntoIterator<Item=S>,
     {
         self.error.extend(error.into_iter().map(Into::into));
         self

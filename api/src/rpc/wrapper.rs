@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::{rpc::ApiError, timestamp, Response};
+use crate::{Response, rpc::ApiError, timestamp};
 
 /// Wrapper for RPC response. Contains processed time, success indicator and payload. For more information, see [module doc](index.html#response).
 #[derive(Debug, Clone, Serialize, Deserialize)]

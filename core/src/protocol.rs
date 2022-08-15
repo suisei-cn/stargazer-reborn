@@ -1,8 +1,6 @@
 //! RPC protocol.
 
-use std::fmt::Display;
-use std::future::Future;
-use std::pin::Pin;
+use std::{fmt::Display, future::Future, pin::Pin};
 
 use eyre::Result;
 use tarpc::server::{BaseChannel, Channel, Serve};
@@ -10,8 +8,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::adapter::WsTransport;
-use crate::models::Task;
+use crate::{adapter::WsTransport, models::Task};
 
 /// RPC protocol for worker-coordinator communication.
 #[tarpc::service]

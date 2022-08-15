@@ -1,11 +1,12 @@
 //! Transport adapter.
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_util::{ready, sink::Sink, SinkExt, Stream, StreamExt};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio_tungstenite::tungstenite::{Error, Message};
 
 use crate::error::TransportError;
@@ -79,14 +80,14 @@ mod tests {
 
     use crate::adapter::WsTransport;
 
-    fn assert_transport<T>()
+    const fn assert_transport<T>()
     where
         T: Transport<ClientMessage<()>, Response<()>>,
     {
     }
 
     #[test]
-    fn must_adapter_transport() {
+    const fn must_adapter_transport() {
         assert_transport::<WsTransport<WebSocketStream<TcpStream>, _>>();
     }
 }

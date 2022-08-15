@@ -1,14 +1,14 @@
-use std::process::Command;
-use std::time::Duration;
+use std::{process::Command, time::Duration};
 
 use assert_cmd::cargo::CommandCargoExt;
 use futures_util::StreamExt;
 use serde_json::json;
+use sg_core::{
+    models::Event,
+    mq::{MessageQueue, Middlewares, RabbitMQ},
+};
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
-
-use sg_core::models::Event;
-use sg_core::mq::{MessageQueue, Middlewares, RabbitMQ};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn must_translate_and_put_back() {
@@ -71,9 +71,11 @@ async fn must_translate_and_put_back() {
     assert_eq!(msg, (Middlewares::default(), translated));
 
     // There's only one message.
-    assert!(timeout(Duration::from_millis(500), consumer.next())
-        .await
-        .is_err());
+    assert!(
+        timeout(Duration::from_millis(500), consumer.next())
+            .await
+            .is_err()
+    );
 
     program.kill().unwrap();
 }

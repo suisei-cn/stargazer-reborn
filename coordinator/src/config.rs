@@ -1,11 +1,12 @@
 //! Coordinator config.
 
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use eyre::Result;
-use figment::providers::{Env, Serialized};
-use figment::Figment;
+use figment::{
+    providers::{Env, Serialized},
+    Figment,
+};
 use serde::{Deserialize, Serialize};
 
 /// Coordinator config.

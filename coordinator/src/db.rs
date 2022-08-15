@@ -4,14 +4,17 @@ use std::collections::HashMap;
 
 use eyre::Result;
 use futures_util::StreamExt;
-use mongodb::bson::oid::ObjectId;
-use mongodb::change_stream::event::OperationType;
-use mongodb::options::{ChangeStreamOptions, FullDocumentType};
-use mongodb::{bson, Client, Collection};
+use mongodb::{
+    bson,
+    bson::oid::ObjectId,
+    change_stream::event::OperationType,
+    options::{ChangeStreamOptions, FullDocumentType},
+    Client,
+    Collection,
+};
+use sg_core::models::{InDB, Task};
 use tracing::{error, info};
 use uuid::Uuid;
-
-use sg_core::models::{InDB, Task};
 
 use crate::{App, Config};
 
@@ -38,6 +41,7 @@ impl DB {
             oid_map: HashMap::new(),
         })
     }
+
     /// Import all tasks from the database.
     ///
     /// # Errors
@@ -58,6 +62,7 @@ impl DB {
         info!("{} task(s) loaded from database", count);
         Ok(())
     }
+
     /// Watch for changes in the database, and add/remove tasks as necessary.
     ///
     /// # Errors

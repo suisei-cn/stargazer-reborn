@@ -1,10 +1,21 @@
 //! Test suite
 //!
-//! This test will temporarily generate a record in auth database with full access privilege, which
-//! will be cleaned up after the test.
+//! This test will temporarily generate a record in auth database with full
+//! access privilege, which will be cleaned up after the test.
 //!
 //! Username: "test"
 //! Password: "test"
+use std::collections::HashSet;
+
+use mongodb::bson::Uuid;
+use once_cell::sync::Lazy;
+use prep::prep;
+use rand::Rng;
+use reqwest::Url;
+use sg_core::models::{EventFilter, User};
+
+use crate::model::UserQuery;
+
 mod prep {
     use std::{
         ops::{Deref, DerefMut},
@@ -54,6 +65,7 @@ mod prep {
 
     impl Deref for TestGuard {
         type Target = Client;
+
         fn deref(&self) -> &Self::Target {
             &self.client
         }
@@ -119,13 +131,13 @@ mod prep {
         });
 
         rt.spawn(async move {
-            tracing::info!("Server starting");
+            info!("Server starting");
 
             INITIALIZED.store(true, Ordering::Release);
 
             server.serve(app).await.unwrap();
 
-            tracing::info!("Server stopped");
+            info!("Server stopped");
         });
 
         (rt, auth)
@@ -150,18 +162,7 @@ mod prep {
     }
 }
 
-use std::collections::HashSet;
-
-use crate::model::UserQuery;
-
-use mongodb::bson::Uuid;
-use once_cell::sync::Lazy;
-use prep::prep;
-use rand::Rng;
-use reqwest::Url;
-use sg_core::models::{EventFilter, User};
-
-static URL: Lazy<Url> = Lazy::new(|| Url::parse("http://placekitten.com/114/514").unwrap());
+static URL: Lazy<Url> = Lazy::new(|| Url::parse("https://placekitten.com/114/514").unwrap());
 
 fn gen_payload() -> String {
     rand::thread_rng()
@@ -197,7 +198,7 @@ fn test_new_user() {
     assert_eq!(name, "Pop");
     assert_eq!(
         avatar.as_ref().map(Url::as_str).unwrap(),
-        "http://placekitten.com/114/514"
+        "https://placekitten.com/114/514"
     );
     assert_eq!(
         event_filter,
@@ -248,7 +249,7 @@ fn test_get_entities() {
 }
 
 #[test]
-fn test_delete_nonexist_user() {
+fn test_delete_nonexistent_user() {
     let c = prep();
 
     let id = "eee29278-273e-4de9-a794-0a3de92f5c4b";
