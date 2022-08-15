@@ -431,6 +431,26 @@ mod tests {
 
     #[derive(Deserialize, Config)]
     #[config(core = "crate")]
+    struct ConfigWithInheritAndExplicitDefaultsTwo {
+        #[config(inherit, default = r#"{ "c": 42 }"#)]
+        a: Nested,
+    }
+
+    #[test]
+    fn must_config_with_inherit_and_explicit_defaults_2() {
+        Jail::expect_with(|_| {
+            let config = ConfigWithInheritAndExplicitDefaultsTwo::from_env("TEST_").unwrap();
+
+            let ConfigWithInheritAndExplicitDefaultsTwo { a: Nested { b, c } } = config;
+            assert!(!b);
+            assert_eq!(c, 42);
+
+            Ok(())
+        });
+    }
+
+    #[derive(Deserialize, Config)]
+    #[config(core = "crate")]
     struct ConfigWithFlattenInheritDefaults {
         d: usize,
         #[serde(flatten)]
