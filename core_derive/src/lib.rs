@@ -137,6 +137,7 @@ struct Field {
 enum Action {
     Append(Field),
     Merge(proc_macro2::TokenStream),
+    Wrapped(String, Vec<Action>),
 }
 
 fn value_from_actions(
@@ -159,15 +160,29 @@ fn value_from_actions(
                     }
                 }
             }
+            Action::Wrapped(key, actions) => {
+                let actions = wrap_in_object(serde_json, &value_from_actions(serde_json, actions));
+                quote! {
+                    dict.insert(#key.to_string(), #actions);
+                }
+            }
         })
         .collect();
 
     quote! {
         {
-            let mut dict = #serde_json::Map::new();
-            #(#stmts)*
-            #serde_json::Value::Object(dict)
+            {
+                let mut dict = #serde_json::Map::new();
+                #(#stmts)*
+                dict
+            }
         }
+    }
+}
+
+fn wrap_in_object(serde_json: &Path, dict: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        #serde_json::Value::Object(#dict)
     }
 }
 
@@ -244,7 +259,7 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
         )
         .collect();
 
-    let value = value_from_actions(&serde_json, actions);
+    let value = wrap_in_object(&serde_json, &value_from_actions(&serde_json, actions));
 
     let struct_ident = input.ident;
     let tokens = quote! {
