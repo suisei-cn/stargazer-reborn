@@ -157,6 +157,10 @@ mod figment_ext {
         T: Deserialize<'a> + ConfigDefault,
     {
         fn from_env(prefix: &str) -> Result<Self> {
+            #[cfg(feature = "dotenvy")]
+            if let Ok(path) = dotenvy::dotenv() {
+                tracing::info!("Loading config from .env file: {}", path.display());
+            }
             Ok(Figment::from(Serialized::defaults(Self::config_defaults()))
                 .merge(Env::prefixed(prefix).split("__"))
                 .extract()?)
