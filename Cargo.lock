@@ -3748,6 +3748,7 @@ dependencies = [
 name = "twitter"
 version = "0.1.0"
 dependencies = [
+ "base",
  "color-eyre",
  "core",
  "egg-mode",

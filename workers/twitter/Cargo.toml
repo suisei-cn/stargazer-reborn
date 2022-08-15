@@ -5,6 +5,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+base = { path = "../base" }
 color-eyre = "0.6"
 egg-mode = "0.16"
 eyre = "0.6"

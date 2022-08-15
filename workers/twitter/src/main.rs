@@ -3,8 +3,9 @@
 #![allow(clippy::module_name_repetitions)]
 #![deny(missing_docs)]
 
+use base::start_worker;
 use eyre::{Result, WrapErr};
-use sg_core::{mq::RabbitMQ, protocol::WorkerRpcExt, utils::FigmentExt};
+use sg_core::{mq::RabbitMQ, utils::FigmentExt};
 use tracing_subscriber::EnvFilter;
 
 use crate::{config::Config, worker::TwitterWorker};
@@ -27,10 +28,8 @@ async fn main() -> Result<()> {
         .await
         .wrap_err("Failed to connect to AMQP")?;
 
-    TwitterWorker::new(config.clone(), mq)
-        .join(config.coordinator_url, config.id, "twitter")
-        .await
-        .wrap_err("Failed to start worker")?;
+    let worker = TwitterWorker::new(config.clone(), mq);
+    start_worker(worker, config.node_config).await?;
 
     Ok(())
 }
