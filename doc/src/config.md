@@ -1,6 +1,8 @@
 # Configuration
 
-All configuration is done by the environment variables, with each executable using their own unique "namespace", as prefix of env variables. For example, the [`api`](./api.md) module uses the `API_` prefix. Don't forget to append the prefix before each variable.
+All configuration is done by the environment variables, with each executable using their own unique "namespace", as
+prefix of env variables. For example, the [`api`](./api.md) module uses the `API_` prefix. Don't forget to append the
+prefix before each variable.
 
 ## Api (server)
 
@@ -9,7 +11,7 @@ All configuration is done by the environment variables, with each executable usi
 **Definition**: `/api/src/server/config.rs`
 
 | Variable              | Type         | Default                   | Description                                                                                       |
-| --------------------- | ------------ | ------------------------- | ------------------------------------------------------------------------------------------------- |
+|-----------------------|--------------|---------------------------|---------------------------------------------------------------------------------------------------|
 | `BIND`                | `SocketAddr` | 127.0.0.1:8000            | Bind address for API server.                                                                      |
 | `TOKEN_TIMEOUT`       | `Duration`   | 600 Seconds               | Duration the session(token) is valid.                                                             |
 | `MONGO_URI`           | `String`     | mongodb://localhost:27017 | MongoDB connection string.                                                                        |
@@ -28,7 +30,7 @@ All configuration is done by the environment variables, with each executable usi
 **Definition**: `/coordinator/src/config.rs`
 
 | Variable           | Type         | Default                   | Description                                            |
-| ------------------ | ------------ | ------------------------- | ------------------------------------------------------ |
+|--------------------|--------------|---------------------------|--------------------------------------------------------|
 | `BIND`             | `SocketAddr` | 127.0.0.1:7000            | Bind address for coordinator.                          |
 | `PING_INTERVAL`    | `Duration`   | 10 Seconds                | Determine how often coordinator sends ping to workers. |
 | `MONGO_URI`        | `String`     | mongodb://localhost:27017 | MongoDB connection string.                             |
@@ -44,7 +46,7 @@ All configuration is done by the environment variables, with each executable usi
 **Available middlewares**: `translate`, `delay`
 
 | Variable           | Type     | Default                           | Middleware  | Description                 |
-| ------------------ | -------- | --------------------------------- | ----------- | --------------------------- |
+|--------------------|----------|-----------------------------------|-------------|-----------------------------|
 | `AMQP_URL`         | `String` | amqp://guest:guest@localhost:5672 |             | AMQP connection url.        |
 | `AMQP_EXCHANGE`    | `String` | stargazer-reborn                  |             | AMQP exchange name.         |
 | `DATABASE_URL`     | `String` |                                   | `delay`     | Database connection url.    |
@@ -61,7 +63,7 @@ All configuration is done by the environment variables, with each executable usi
 **Available workers**: `bililive`, `twitter`
 
 | Variable          | Type       | Default                           | Worker    | Description                        |
-| ----------------- | ---------- | --------------------------------- | --------- | ---------------------------------- |
+|-------------------|------------|-----------------------------------|-----------|------------------------------------|
 | `ID`              | `Uuid`     |                                   |           | Unique worker ID.                  |
 | `AMQP_URL`        | `String`   | amqp://guest:guest@localhost:5672 |           | AMQP connection url.               |
 | `AMQP_EXCHANGE`   | `String`   | stargazer-reborn                  |           | AMQP exchange name.                |
@@ -78,7 +80,7 @@ All configuration is done by the environment variables, with each executable usi
 **Available bots**: `telegram`
 
 | Variable        | Type     | Default                           | Bot        | Description          |
-| --------------- | -------- | --------------------------------- | ---------- | -------------------- |
+|-----------------|----------|-----------------------------------|------------|----------------------|
 | `AMQP_URL`      | `String` | amqp://guest:guest@localhost:5672 |            | AMQP connection url. |
 | `AMQP_EXCHANGE` | `String` | stargazer-reborn                  |            | AMQP exchange name.  |
 | `API_URL`       | `Url`    | http://127.0.0.1:8000/v1/         |            | Api url.             |

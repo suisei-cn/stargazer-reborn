@@ -1,25 +1,29 @@
 //! Worker node and worker group.
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{Debug, Formatter},
+    sync::{Arc, Weak},
+};
 
 use consistent_hash_ring::Ring;
 use futures_util::{Sink, Stream};
+use sg_core::{
+    adapter::WsTransport,
+    models::Task,
+    protocol::WorkerRpcClient,
+    utils::ScopedJoinHandle,
+};
 use tap::TapFallible;
-use tarpc::client::{Config as ClientConfig, RpcError};
-use tarpc::context::Context;
-use tokio::sync::Mutex;
-use tokio::sync::Notify;
+use tarpc::{
+    client::{Config as ClientConfig, RpcError},
+    context::Context,
+};
+use tokio::sync::{Mutex, Notify};
 use tokio_tungstenite::tungstenite::{Error as WsError, Message};
 use tracing::{debug, error, warn};
 use uuid::Uuid;
-
-use sg_core::adapter::WsTransport;
-use sg_core::models::Task;
-use sg_core::protocol::WorkerRpcClient;
-use sg_core::utils::ScopedJoinHandle;
 
 use crate::config::Config;
 
@@ -60,6 +64,7 @@ impl WorkerGroup {
 
         Self { inner, balance_job }
     }
+
     /// Get a weak reference to the worker group.
     #[must_use]
     pub fn weak(&self) -> WeakWorkerGroup {
@@ -68,6 +73,7 @@ impl WorkerGroup {
             balance_job: Arc::downgrade(&self.balance_job),
         }
     }
+
     /// Lock the worker group and mutate its state.
     pub async fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O + Send) -> O {
         let mut lock = self.inner.lock().await;
@@ -164,6 +170,7 @@ impl WorkerGroupImpl {
             poison: AtomicBool::new(false),
         }
     }
+
     /// Check if the worker group is poisoned.
     ///
     /// # Panics
@@ -175,6 +182,7 @@ impl WorkerGroupImpl {
             "Worker group is poisoned"
         );
     }
+
     /// Add a new worker to the group.
     pub fn add_worker(&mut self, worker: Arc<Worker>) {
         debug!(worker_id = %worker.id, "Add worker to group");
@@ -195,6 +203,7 @@ impl WorkerGroupImpl {
 
         self.balance_notify.notify_one();
     }
+
     /// Remove a worker from the group.
     pub fn remove_worker(&mut self, id: Uuid) {
         debug!(worker_id = %id, "Remove worker from group");
@@ -203,6 +212,7 @@ impl WorkerGroupImpl {
 
         self.balance_notify.notify_one();
     }
+
     /// Add a task to the group.
     pub fn add_task(&mut self, task: Task) {
         let id = task.id;
@@ -212,6 +222,7 @@ impl WorkerGroupImpl {
 
         self.balance_notify.notify_one();
     }
+
     /// Remove a task from the group.
     pub fn remove_task(&mut self, id: Uuid) {
         debug!(task_id = %id, "Remove task from group");
@@ -222,8 +233,9 @@ impl WorkerGroupImpl {
 
     /// Balance the group.
     ///
-    /// Workers not responding or inconsistent will be removed. Return `false` if there's a worker removed.
-    /// Balance should be called again in this case.
+    /// Workers not responding or inconsistent will be removed. Return `false`
+    /// if there's a worker removed. Balance should be called again in this
+    /// case.
     pub async fn balance(&mut self) -> bool {
         self.balance_impl()
             .await
@@ -239,13 +251,15 @@ impl WorkerGroupImpl {
     /// # Errors
     /// If a worker is not responding or inconsistent, return id of that worker.
     ///
-    /// Beware that if an error is returned, the tasks field of the worker is poisoned.
+    /// Beware that if an error is returned, the tasks field of the worker is
+    /// poisoned.
     async fn balance_impl(&mut self) -> Result<(), Uuid> {
         // TODO instrument this future
 
         // Remove gone tasks.
         for worker in self.workers.values_mut() {
-            // Note that we collect tasks_gone first to avoid holding the lock across awaits.
+            // Note that we collect tasks_gone first to avoid holding the lock across
+            // awaits.
 
             // Do RPC to remove tasks from remote worker.
             let tasks_gone: Vec<_> = worker
@@ -354,7 +368,8 @@ impl WorkerGroupImpl {
 
     /// Validate if the internal state of the group is consistent.
     ///
-    /// This method is quite expensive due to locking, and should be used only for debugging.
+    /// This method is quite expensive due to locking, and should be used only
+    /// for debugging.
     ///
     /// # Panics
     /// Panics if the group is not consistent.
@@ -414,16 +429,19 @@ impl WorkerGroupImpl {
     pub fn worker_len(&self) -> usize {
         self.workers.len()
     }
+
     /// Returns `true` if the group contains no workers.
     #[allow(clippy::must_use_candidate)]
     pub fn worker_is_empty(&self) -> bool {
         self.workers.is_empty()
     }
+
     /// Returns the number of tasks in the worker group.
     #[allow(clippy::must_use_candidate)]
     pub fn task_len(&self) -> usize {
         self.tasks.len()
     }
+
     /// Returns `true` if the group contains no tasks.
     #[allow(clippy::must_use_candidate)]
     pub fn task_is_empty(&self) -> bool {
@@ -493,6 +511,7 @@ impl Worker {
             }
         })
     }
+
     /// Remove self from worker group.
     pub async fn remove_self(&self) {
         if let Some(parent) = self.parent.upgrade() {

@@ -2,9 +2,8 @@ use async_trait::async_trait;
 use eyre::{ContextCompat, Result};
 use reqwest::Client;
 use serde_json::Value;
-use tracing::warn;
-
 use sg_core::models::Event;
+use tracing::warn;
 
 #[async_trait]
 pub trait Translator: Send + Sync {
@@ -99,9 +98,8 @@ impl Translator for MockTranslator {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use uuid::Uuid;
-
     use sg_core::models::Event;
+    use uuid::Uuid;
 
     use crate::translate::{BaiduTranslator, MockTranslator, Translator};
 
@@ -168,7 +166,10 @@ mod tests {
         ) {
             let translator = BaiduTranslator::new(app_id.parse().unwrap(), app_secret.to_string());
             let translated = translator
-                .translate_text("Hoshimachi Suisei is a Japanese virtual YouTuber. She began posting videos as an independent creator in March 2018.")
+                .translate_text(
+                    "Hoshimachi Suisei is a Japanese virtual YouTuber. She began posting videos \
+                     as an independent creator in March 2018.",
+                )
                 .await
                 .unwrap();
             assert!(translated.contains("星街彗星"));

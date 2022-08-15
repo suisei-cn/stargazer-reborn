@@ -1,13 +1,16 @@
 use eyre::{Result, WrapErr};
 use futures_util::StreamExt;
+use sg_core::{
+    mq::{MessageQueue, RabbitMQ},
+    utils::FigmentExt,
+};
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 
-use sg_core::mq::{MessageQueue, RabbitMQ};
-use sg_core::utils::FigmentExt;
-
-use crate::config::Config;
-use crate::translate::{BaiduTranslator, MockTranslator, Translator};
+use crate::{
+    config::Config,
+    translate::{BaiduTranslator, MockTranslator, Translator},
+};
 
 mod config;
 mod translate;

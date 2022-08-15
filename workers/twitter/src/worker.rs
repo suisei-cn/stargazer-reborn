@@ -1,30 +1,28 @@
 //! Worker implementation.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use egg_mode::tweet::user_timeline;
-use egg_mode::user::UserID;
-use egg_mode::Token;
+use egg_mode::{tweet::user_timeline, user::UserID, Token};
 use eyre::Result;
 use futures_util::StreamExt;
 use parking_lot::Mutex;
 use serde_json::Value;
+use sg_core::{
+    models::{Event, Task},
+    mq::MessageQueue,
+    protocol::WorkerRpc,
+    utils::ScopedJoinHandle,
+};
 use tap::TapOptional;
 use tarpc::context::Context;
-use tokio::time::interval;
-use tokio::time::sleep;
+use tokio::time::{interval, sleep};
 use tracing::{error, info};
 use uuid::Uuid;
 
-use sg_core::models::{Event, Task};
-use sg_core::mq::MessageQueue;
-use sg_core::protocol::WorkerRpc;
-use sg_core::utils::ScopedJoinHandle;
-
-use crate::twitter::{TimelineStream, Tweet};
-use crate::Config;
+use crate::{
+    twitter::{TimelineStream, Tweet},
+    Config,
+};
 
 /// Twitter worker.
 #[derive(Clone)]
@@ -127,7 +125,8 @@ impl WorkerRpc for TwitterWorker {
     }
 }
 
-// Fetch the timeline for the given user and send the tweets to the message queue.
+// Fetch the timeline for the given user and send the tweets to the message
+// queue.
 async fn twitter_task(
     user_id: UserID,
     token: &Token,

@@ -15,12 +15,12 @@ use url::Url;
 use sg_auth::AuthClient;
 use sg_core::models::{Entity, EventFilter, Group, Meta, Task, User};
 
-use crate::model::Entities;
 use crate::{
     model::{AddTaskParam, Bot, UserQuery},
     rpc::{ApiError, ApiResult},
-    server::{config::Config, Claims, JWTContext, Privilege},
+    server::{Claims, config::Config, JWTContext, Privilege},
 };
+use crate::model::Entities;
 
 /// Context being shared between handlers. This will be cloned every time a handler is called.
 /// So all underlying data should be wrapped in Arc or similar shared reference thingy.
@@ -58,7 +58,7 @@ impl Context {
         &self.config
     }
 
-    /// Construct self with preconnected database.
+    /// Construct self with pre-connected database.
     #[inline]
     pub fn new_with_db(db: Database, jwt: Arc<JWTContext>, config: Arc<Config>) -> Self {
         let auth = AuthClient::new(db.collection(&config.auth_collection));
@@ -283,7 +283,7 @@ impl Context {
             async { self.entities().find(None, None).await?.try_collect().await },
             async { self.groups().find(None, None).await?.try_collect().await },
         )
-        .await?;
+            .await?;
 
         Ok(Entities { vtbs, groups })
     }
@@ -314,7 +314,7 @@ impl Context {
     pub async fn add_tasks(
         &self,
         entity_id: &Uuid,
-        tasks: impl Iterator<Item = AddTaskParam> + Send,
+        tasks: impl Iterator<Item=AddTaskParam> + Send,
     ) -> ApiResult<Vec<Task>> {
         let tasks = tasks
             .map(|x| x.into_task_with(*entity_id))

@@ -1,22 +1,21 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bililive::RetryConfig;
 use eyre::{Result, WrapErr};
 use futures_util::StreamExt;
 use parking_lot::Mutex;
 use serde::Deserialize;
+use sg_core::{
+    models::{Event, Task},
+    mq::{MessageQueue, Middlewares},
+    protocol::WorkerRpc,
+    utils::ScopedJoinHandle,
+};
 use tap::TapOptional;
 use tarpc::context::Context;
 use tokio::time::sleep;
 use tracing::{error, info, trace};
 use uuid::Uuid;
-
-use sg_core::models::{Event, Task};
-use sg_core::mq::{MessageQueue, Middlewares};
-use sg_core::protocol::WorkerRpc;
-use sg_core::utils::ScopedJoinHandle;
 
 use crate::bililive::LiveRoom;
 

@@ -3,10 +3,11 @@
 #![warn(clippy::all)]
 #![allow(clippy::module_name_repetitions)]
 
+pub use rpc::*;
+
 mod_use::mod_use![utils];
 
 pub mod rpc;
-pub use rpc::*;
 
 #[cfg(any(feature = "client", feature = "client_blocking"))]
 pub mod client;

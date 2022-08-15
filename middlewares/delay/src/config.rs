@@ -1,7 +1,6 @@
 //! Translate middleware config.
 
 use serde::{Deserialize, Serialize};
-
 use sg_core::utils::Config;
 
 /// Coordinator config.
@@ -21,7 +20,6 @@ pub struct Config {
 #[cfg(test)]
 mod tests {
     use figment::Jail;
-
     use sg_core::utils::FigmentExt;
 
     use crate::config::Config;

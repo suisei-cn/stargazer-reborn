@@ -1,6 +1,7 @@
 //! API Client, with both `blocking` and `non_blocking` implementation.
 //!
-//! This module requires either or both of `client` and `client_blocking` feature to use.
+//! This module requires either or both of `client` and `client_blocking`
+//! feature to use.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +27,8 @@ enum Shim<R> {
 impl<T> From<Shim<T>> for ApiResult<T> {
     fn from(shim: Shim<T>) -> Self {
         match shim {
-            Shim::Ok(res) => Self::Ok(res),
-            Shim::Err(err) => Self::Err(err),
+            Shim::Ok(res) => Ok(res),
+            Shim::Err(err) => Err(err),
         }
     }
 }

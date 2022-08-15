@@ -1,13 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-  "api",
-  "auth",
-  "coordinator",
-  "core",
-  "core_derive",
-  "middlewares/delay",
-  "middlewares/translate",
-  "workers/bililive",
-  "workers/twitter",
+    "api",
+    "auth",
+    "coordinator",
+    "core",
+    "core_derive",
+    "middlewares/*",
+    "workers/*",
 ]

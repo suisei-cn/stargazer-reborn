@@ -1,22 +1,35 @@
 //! Message queue for workers.
 
-use std::convert::Infallible;
-use std::fmt::{Display, Formatter};
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-use std::str::FromStr;
-use std::{iter, vec};
+use std::{
+    convert::Infallible,
+    fmt::{Display, Formatter},
+    iter,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    str::FromStr,
+    vec,
+};
 
 use async_trait::async_trait;
 use eyre::Result;
 use futures_util::{future, stream, Stream, StreamExt};
 use itertools::Itertools;
-use lapin::options::{
-    BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions, QueueBindOptions,
-    QueueDeclareOptions,
+use lapin::{
+    options::{
+        BasicConsumeOptions,
+        BasicPublishOptions,
+        ExchangeDeclareOptions,
+        QueueBindOptions,
+        QueueDeclareOptions,
+    },
+    types::FieldTable,
+    BasicProperties,
+    Channel,
+    Connection,
+    ConnectionProperties,
+    Consumer,
+    ExchangeKind,
 };
-use lapin::types::FieldTable;
-use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, Consumer, ExchangeKind};
 use tap::TapFallible;
 use tracing::{debug, error, info};
 
@@ -64,7 +77,8 @@ impl RabbitMQ {
     /// Connect to a `RabbitMQ` server.
     ///
     /// # Errors
-    /// Returns an error if the connection fails or the exchange can't be declared.
+    /// Returns an error if the connection fails or the exchange can't be
+    /// declared.
     pub async fn new(addr: &str, exchange: &str) -> Result<Self> {
         let channel = Connection::connect(
             addr,
@@ -94,6 +108,7 @@ impl RabbitMQ {
             channel,
         })
     }
+
     async fn consumer_connect(&self, middleware: Option<&str>) -> Result<Consumer> {
         let routing_key = middleware.map_or_else(
             || String::from("event"),
@@ -185,7 +200,8 @@ pub struct Middlewares {
 }
 
 impl Middlewares {
-    /// Obtain a middleware set from a routing key, removing its first and last component.
+    /// Obtain a middleware set from a routing key, removing its first and last
+    /// component.
     #[must_use]
     pub fn from_routing_key(s: &str) -> Self {
         let mut middlewares: Vec<_> = s.split('.').skip(1).map(ToString::to_string).collect();
@@ -196,6 +212,7 @@ impl Middlewares {
 
 impl Deref for Middlewares {
     type Target = [String];
+
     fn deref(&self) -> &Self::Target {
         &self.middlewares
     }
@@ -224,8 +241,8 @@ impl Display for Middlewares {
 }
 
 impl IntoIterator for Middlewares {
-    type Item = String;
     type IntoIter = vec::IntoIter<String>;
+    type Item = String;
 
     fn into_iter(self) -> Self::IntoIter {
         self.middlewares.into_iter()
@@ -243,8 +260,10 @@ pub mod mock {
     use tokio::sync::broadcast;
     use tokio_stream::wrappers::BroadcastStream;
 
-    use crate::models::Event;
-    use crate::mq::{MessageQueue, Middlewares};
+    use crate::{
+        models::Event,
+        mq::{MessageQueue, Middlewares},
+    };
 
     /// A mock message queue.
     pub struct MockMQ {
@@ -306,10 +325,12 @@ mod tests {
     use serde_json::json;
     use tokio::time::timeout;
 
-    use crate::models::Event;
     #[cfg(feature = "mock")]
     use crate::mq::mock::MockMQ;
-    use crate::mq::{MessageQueue, Middlewares, RabbitMQ};
+    use crate::{
+        models::Event,
+        mq::{MessageQueue, Middlewares, RabbitMQ},
+    };
 
     #[tokio::test]
     async fn tests() {

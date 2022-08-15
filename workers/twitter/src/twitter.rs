@@ -1,14 +1,17 @@
 //! Twitter struct and stream.
 
-use std::cmp::max;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    cmp::max,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use egg_mode::entities::MediaType;
-use egg_mode::error::Error;
-use egg_mode::tweet::Tweet as RawTweet;
-use egg_mode::tweet::{Timeline, TimelineFuture};
-use egg_mode::Response;
+use egg_mode::{
+    entities::MediaType,
+    error::Error,
+    tweet::{Timeline, TimelineFuture, Tweet as RawTweet},
+    Response,
+};
 use futures_util::{FutureExt, Stream};
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +69,8 @@ impl TimelineStream {
     /// Creates a new stream of tweets.
     ///
     /// # Errors
-    /// Returns an error if the stream could not be created due to network issues.
+    /// Returns an error if the stream could not be created due to network
+    /// issues.
     pub async fn new(timeline: Timeline) -> Result<Self, Error> {
         let (timeline, _) = timeline.start().await?;
         Ok(Self {

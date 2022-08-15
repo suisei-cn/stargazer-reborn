@@ -7,12 +7,15 @@ use std::{
 
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2, PasswordHash, PasswordVerifier,
+    Argon2,
+    PasswordHash,
+    PasswordVerifier,
 };
 use mongodb::{
     bson::{doc, to_bson},
     options::{FindOneAndUpdateOptions, ReturnDocument, UpdateOptions},
-    Collection, Cursor,
+    Collection,
+    Cursor,
 };
 
 mod_use::mod_use![model, error];
@@ -74,11 +77,13 @@ impl AuthClient {
 
     /// Return the count of records in the database.
     ///
-    /// In debug mode, this will do a more expensive but accurate [`count_documents`].
-    /// In release mode, this will use [`estimated_document_count`],
-    /// which returns metadata of the database without actually call a `find`.
+    /// In debug mode, this will do a more expensive but accurate
+    /// [`count_documents`]. In release mode, this will use
+    /// [`estimated_document_count`], which returns metadata of the database
+    /// without actually call a `find`.
     ///
-    /// For more detail, see document of [`count`] and [`countDocuments`] of mongodb.
+    /// For more detail, see document of [`count`] and [`countDocuments`] of
+    /// mongodb.
     ///
     /// [`count_documents`]: Collection::count_documents
     /// [`estimated_document_count`]: Collection::estimated_document_count
@@ -102,7 +107,8 @@ impl AuthClient {
     /// If one record with same username exists, this will leave it intact.
     ///
     /// # Errors
-    /// Return an error if unable to insert the record, or failed to compute the hash.
+    /// Return an error if unable to insert the record, or failed to compute the
+    /// hash.
     pub async fn new_record(
         &self,
         username: impl Into<String> + Send,
@@ -135,10 +141,12 @@ impl AuthClient {
     /// Try update the permission set of a record.
     ///
     /// Return the new permission set.
-    /// If username or password is invalid, this will return `None` and no update will be done.
+    /// If username or password is invalid, this will return `None` and no
+    /// update will be done.
     ///
     /// # Errors
-    /// Return an error if unable to insert the record, or failed to compute the hash.
+    /// Return an error if unable to insert the record, or failed to compute the
+    /// hash.
     pub async fn update_record(
         &self,
         username: impl AsRef<str> + Send,
@@ -192,10 +200,12 @@ impl AuthClient {
 
     /// Look up permission of a user by username and password.
     ///
-    /// When the username and password combination are invalid, this will return [`PermissionSet::EMPTY`].
+    /// When the username and password combination are invalid, this will return
+    /// [`PermissionSet::EMPTY`].
     ///
     /// # Errors
-    /// Return an error if unable to insert the record, or failed to compute the hash.
+    /// Return an error if unable to insert the record, or failed to compute the
+    /// hash.
     pub async fn look_up(
         &self,
         username: impl AsRef<str> + Send,

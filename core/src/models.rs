@@ -1,11 +1,12 @@
 //! Models for the entity collection.
-use std::collections::{HashMap, HashSet};
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut},
+};
 
 use eyre::{bail, Result, WrapErr};
 use isolanguage_1::LanguageCode;
-use mongodb::bson::oid::ObjectId;
-use mongodb::bson::Uuid;
+use mongodb::bson::{oid::ObjectId, Uuid};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use url::Url;
@@ -108,7 +109,8 @@ impl Task {
     }
 }
 
-/// Event pushed by workers (or addons) to the message queue and received by IM agents.
+/// Event pushed by workers (or addons) to the message queue and received by IM
+/// agents.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
     /// The unique identifier of the event.
@@ -122,7 +124,8 @@ pub struct Event {
 }
 
 impl Event {
-    /// Create a new event with a given id with its fields set by a serializable object.
+    /// Create a new event with a given id with its fields set by a serializable
+    /// object.
     ///
     /// # Errors
     /// Returns an error if the fields cannot be serialized into a map.
@@ -147,6 +150,7 @@ impl Event {
             fields,
         })
     }
+
     /// Create a new event with its fields set by a serializable object.
     ///
     /// # Errors
@@ -163,7 +167,8 @@ impl Event {
 /// IM subscriber.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct User {
-    /// The unique identifier of the user. The same physical user in different IMs should have different id.
+    /// The unique identifier of the user. The same physical user in different
+    /// IMs should have different id.
     pub id: Uuid,
     /// The IM that the user is in, e.g. "tg" for telegram
     pub im: String,
@@ -200,6 +205,7 @@ impl<T> InDB<T> {
     pub const fn id(&self) -> ObjectId {
         self.id
     }
+
     /// Get the inner body.
     #[allow(clippy::missing_const_for_fn)]
     pub fn inner(self) -> T {

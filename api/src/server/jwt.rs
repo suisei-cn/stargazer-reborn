@@ -9,7 +9,7 @@ use std::{
 
 use axum::{body::BoxBody, http::Request};
 use jsonwebtoken::{
-    errors::Result as JwtResult, DecodingKey, EncodingKey, Header, TokenData, Validation,
+    DecodingKey, EncodingKey, errors::Result as JwtResult, Header, TokenData, Validation,
 };
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
@@ -163,15 +163,15 @@ impl JWTGuard {
 }
 
 impl<B> AuthorizeRequest<B> for JWTGuard
-where
-    B: Send + Sync + 'static,
+    where
+        B: Send + Sync + 'static,
 {
     type ResponseBody = BoxBody;
 
     fn authorize(
         &mut self,
         request: &mut Request<B>,
-    ) -> std::result::Result<(), http::Response<Self::ResponseBody>> {
+    ) -> Result<(), http::Response<Self::ResponseBody>> {
         tracing::debug!(method = ?request.uri().path(), "Authorizing request");
         let token = request
             .headers()
@@ -186,7 +186,7 @@ where
                 ApiError::bad_request(
                     "Invalid authentication header, this should be in bearer token format",
                 )
-                .as_response()
+                    .as_response()
             })?;
 
         let claims = self

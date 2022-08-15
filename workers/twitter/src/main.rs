@@ -4,14 +4,10 @@
 #![deny(missing_docs)]
 
 use eyre::{Result, WrapErr};
+use sg_core::{mq::RabbitMQ, protocol::WorkerRpcExt, utils::FigmentExt};
 use tracing_subscriber::EnvFilter;
 
-use sg_core::mq::RabbitMQ;
-use sg_core::protocol::WorkerRpcExt;
-use sg_core::utils::FigmentExt;
-
-use crate::config::Config;
-use crate::worker::TwitterWorker;
+use crate::{config::Config, worker::TwitterWorker};
 
 pub mod config;
 pub mod twitter;

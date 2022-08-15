@@ -13,11 +13,11 @@ use sg_auth::{Permission, PermissionSet};
 use crate::{
     model::{GetInterest, Health, Interest, Login, Null, UserQuery},
     rpc::{
-        model::{
-            AddEntity, AddTask, AddUser, AuthUser, Authorized, DelEntity, DelTask, DelUser,
+        ApiError,
+        ApiResult, model::{
+            AddEntity, AddTask, AddUser, Authorized, AuthUser, DelEntity, DelTask, DelUser,
             GetEntities, NewToken, Token, UpdateEntity, UpdateSetting,
         },
-        ApiError, ApiResult,
     },
     server::{Config, Context, JWTContext, JWTGuard, Privilege, RouterExt},
 };

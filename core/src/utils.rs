@@ -2,12 +2,11 @@
 
 use std::ops::{Deref, DerefMut};
 
-use tokio::task::JoinHandle;
-
 #[cfg(any(feature = "core_derive", test))]
 pub use core_derive::Config;
 #[cfg(any(feature = "figment", test))]
 pub use figment_ext::*;
+use tokio::task::JoinHandle;
 
 /// A wrapper that holds a join handle and abort the task if dropped.
 #[derive(Debug)]
@@ -37,7 +36,7 @@ impl<T> Drop for ScopedJoinHandle<T> {
 ///
 /// [`map`]: serde_json::Map
 macro_rules! map {
-    ($k: expr, $v: expr) => {{
+    ($k:expr, $v:expr) => {{
         let mut map = serde_json::Map::new();
         map.insert($k.into(), Value::String($v.into()));
         map
@@ -49,8 +48,10 @@ pub(crate) use map;
 #[cfg(any(feature = "figment", test))]
 mod figment_ext {
     use eyre::Result;
-    use figment::providers::{Env, Serialized};
-    use figment::Figment;
+    use figment::{
+        providers::{Env, Serialized},
+        Figment,
+    };
     use serde::Deserialize;
 
     #[doc(hidden)]
@@ -65,8 +66,9 @@ mod figment_ext {
     ///
     /// ```
     /// use std::time::Duration;
-    /// use serde::Deserialize;
+    ///
     /// use core_derive::Config;
+    /// use serde::Deserialize;
     ///
     /// // Override crate name for core crate if its name is not `sg_core`.
     /// // E.g. `#[config(core = "crate_name")]`
@@ -87,22 +89,24 @@ mod figment_ext {
     ///     // Partial default assignments are allowed,
     ///     // as long as given values are valid json literals.
     ///     #[config(default = r#"{ "a": 42 }"#)]
-    ///     nested: Nested
+    ///     nested: Nested,
     /// }
     ///
     /// #[derive(Deserialize)]
     /// struct Nested {
     ///     a: usize,
-    ///     b: usize
+    ///     b: usize,
     /// }
     /// ```
     /// # Inherit default values from nested field
-    /// To inherit default config values from nested field, use the `inherit` attribute.
+    /// To inherit default config values from nested field, use the `inherit`
+    /// attribute.
     ///
     /// ```rust
     /// use std::time::Duration;
-    /// use serde::Deserialize;
+    ///
     /// use core_derive::Config;
+    /// use serde::Deserialize;
     ///
     /// // Override crate name for core crate if its name is not `sg_core`.
     /// // E.g. `#[config(core = "crate_name")]`
@@ -118,17 +122,16 @@ mod figment_ext {
     ///     // `inherit(flatten)` can be used in combination with `serde(flatten)`.
     ///     #[serde(flatten)]
     ///     #[config(inherit(flatten))]
-    ///     flatten: Nested
+    ///     flatten: Nested,
     /// }
     ///
     /// #[derive(Deserialize, Config)]
     /// struct Nested {
     ///     #[config(default = "42")]
     ///     answer: usize,
-    ///     age: Nested
+    ///     age: Nested,
     /// }
     /// ```
-    ///
     pub trait FigmentExt {
         /// Load config from environment variables.
         ///
@@ -170,15 +173,12 @@ mod figment_ext {
 mod tests {
     use std::time::Duration;
 
+    use core_derive::Config;
     use figment::Jail;
     use serde::Deserialize;
-    use tokio::task::yield_now;
-    use tokio::time::sleep;
+    use tokio::{task::yield_now, time::sleep};
 
-    use core_derive::Config;
-
-    use crate::utils::FigmentExt;
-    use crate::utils::ScopedJoinHandle;
+    use crate::utils::{FigmentExt, ScopedJoinHandle};
 
     #[tokio::test]
     async fn must_abort_on_drop() {

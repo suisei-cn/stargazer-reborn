@@ -1,7 +1,6 @@
 //! Server implementation of the RPC API.
 
 use color_eyre::Result;
-
 use sg_core::utils::FigmentExt;
 
 mod_use::mod_use![config, handler, jwt, context, ext];

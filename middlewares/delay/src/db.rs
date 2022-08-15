@@ -1,17 +1,20 @@
-use std::fmt::Debug;
-use std::io::Write;
+#![allow(clippy::extra_unused_lifetimes)]
+
+use std::{fmt::Debug, io::Write};
 
 use chrono::{NaiveDateTime, Utc};
-use diesel::backend::Backend;
-use diesel::deserialize::FromSql;
-use diesel::serialize::{Output, ToSql};
-use diesel::sql_types;
-use diesel::{AsExpression, FromSqlRow, Insertable, Queryable};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-
-use sg_core::models::Event;
-use sg_core::mq::Middlewares;
+use diesel::{
+    backend::Backend,
+    deserialize::FromSql,
+    serialize::{Output, ToSql},
+    sql_types,
+    AsExpression,
+    FromSqlRow,
+    Insertable,
+    Queryable,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sg_core::{models::Event, mq::Middlewares};
 
 use crate::schema::delayed_messages;
 

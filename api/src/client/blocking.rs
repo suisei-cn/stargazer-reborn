@@ -19,7 +19,8 @@ pub struct Client {
 impl Client {
     /// Creates new client instance.
     ///
-    /// Note that URL should comes with api version in path and a trailing slash.
+    /// Note that URL should comes with api version in path and a trailing
+    /// slash.
     ///
     /// # Errors
     /// Fails on invalid URL.
@@ -29,7 +30,8 @@ impl Client {
 
     /// Creates new client instance with given reqwest blocking client.
     ///
-    /// Note that URL should comes with api version in path and a trailing slash.
+    /// Note that URL should comes with api version in path and a trailing
+    /// slash.
     ///
     /// # Errors
     /// Fails on invalid URL.
@@ -44,7 +46,8 @@ impl Client {
     /// Invoke an RPC method.
     ///
     /// # Errors
-    /// Fails on invalid `Request` method, bad request body, network issue or bad response.
+    /// Fails on invalid `Request` method, bad request body, network issue or
+    /// bad response.
     pub fn invoke<R>(&self, req: &R) -> Result<R::Res>
     where
         R: Request + Serialize,
@@ -82,7 +85,8 @@ impl Client {
     /// Returns `Some(Token)` if there's already one stored.
     ///
     /// # Errors
-    /// Fails on invalid `Login` method, bad request body, network issue or bad response.
+    /// Fails on invalid `Login` method, bad request body, network issue or bad
+    /// response.
     pub fn login_and_store(
         &mut self,
         username: impl Into<String>,

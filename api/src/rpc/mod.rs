@@ -1,5 +1,5 @@
-//! RPC definitions. Contains all the RPC methods and model, but does not have any implemtentation.
-//! For server, see [`rpc::server`](../server/index.html).
+//! RPC definitions. Contains all the RPC methods and model, but does not have
+//! any implementation. For server, see [`rpc::server`](../server/index.html).
 //! For client, see [`rpc::client`](../client/index.html).
 //!
 //! ## Traits
@@ -10,9 +10,11 @@
 //! ### Request
 //! **This trait Requires [`DeserializeOwned`](serde::de::DeserializeOwned)**
 //!
-//! Used to define a request object which represents a request body sent from client to server.
+//! Used to define a request object which represents a request body sent from
+//! client to server.
 //!
-//! In order to invoke the method, send a POST http request to `/v1/:method_name` with request param as the body.
+//! In order to invoke the method, send a POST http request to
+//! `/v1/:method_name` with request param as the body.
 //!
 //! Here is [all defined methods](model)
 //!
@@ -24,11 +26,12 @@
 //! **This trait Requires [`Serialize`](serde::ser::Serialize)**
 //!
 //! Used to define a response payload sent from server to client.
-//! All response should be wrapped in [`ResponseObject`], which includes extra information about the response,
-//! e.g. time it's being processed and whether it's successful.
+//! All response should be wrapped in [`ResponseObject`], which includes extra
+//! information about the response, e.g. time it's being processed and whether
+//! it's successful.
 //!
-//! To construct a [`ResponseObject`], method [`Response::packed`] should be used.
-//! It's automatically implemented by [`Response`].
+//! To construct a [`ResponseObject`], method [`Response::packed`] should be
+//! used. It's automatically implemented by [`Response`].
 //!
 //! ## Helper macros
 //!
@@ -37,8 +40,10 @@
 //! [`methods!`] will do following things:
 //! - Define a request struct for each RPC method.
 //! - Implement [`Request`] for that request struct.
-//! - If response object has fields, define it and implement [`Response`] for it.
-//! - If `client` feature is enabled, generate methods for [`Client`](crate::client::Client) to invoke RPC methods.
+//! - If response object has fields, define it and implement [`Response`] for
+//!   it.
+//! - If `client` feature is enabled, generate methods for
+//!   [`Client`](crate::client::Client) to invoke RPC methods.
 
 mod_use::mod_use![wrapper, traits, error, ext];
 
@@ -220,9 +225,13 @@ macro_rules! methods {
 /// ```rust
 /// # use api::successful_response;
 /// #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
-/// struct Foo { foo: String };
+/// struct Foo {
+///     foo: String,
+/// };
 /// #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
-/// struct Bar { bar: usize };
+/// struct Bar {
+///     bar: usize,
+/// };
 ///
 /// successful_response![Foo, Bar];
 /// ```

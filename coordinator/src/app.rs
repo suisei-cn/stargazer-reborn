@@ -1,23 +1,30 @@
 //! Application state.
-use std::collections::HashMap;
-use std::error::Error;
-use std::ops::Deref;
-use std::result::Result as StdResult;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    error::Error,
+    ops::Deref,
+    result::Result as StdResult,
+    str::FromStr,
+    sync::Arc,
+};
 
 use eyre::Result;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Mutex;
-use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use tokio_tungstenite::tungstenite::http::{HeaderMap, StatusCode};
+use sg_core::models::Task;
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::Mutex,
+};
+use tokio_tungstenite::tungstenite::{
+    handshake::server::{ErrorResponse, Request, Response},
+    http::{HeaderMap, StatusCode},
+};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use sg_core::models::Task;
-
-use crate::config::Config;
-use crate::worker::{Worker, WorkerGroup};
+use crate::{
+    config::Config,
+    worker::{Worker, WorkerGroup},
+};
 
 /// The application state.
 #[derive(Debug, Clone)]
@@ -29,6 +36,7 @@ impl App {
     pub fn new(config: Config) -> Self {
         Self(Arc::new(AppImpl::new(config)))
     }
+
     /// Serve the application.
     ///
     /// # Errors
@@ -100,6 +108,7 @@ impl AppImpl {
             config,
         }
     }
+
     /// Add a task to worker group of its kind.
     pub async fn add_task(&self, task: Task) {
         self.worker_groups
@@ -110,12 +119,14 @@ impl AppImpl {
             .with(|group| group.add_task(task))
             .await;
     }
+
     /// Remove a task from worker groups.
     pub async fn remove_task(&self, id: Uuid) {
         for group in self.worker_groups.lock().await.values_mut() {
             group.with(|group| group.remove_task(id)).await;
         }
     }
+
     /// Accept a new worker.
     ///
     /// # Errors

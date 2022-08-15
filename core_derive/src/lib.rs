@@ -1,11 +1,14 @@
+use darling::{
+    ast::Data,
+    util::{Flag, Ignored, Override, SpannedValue},
+    Error,
+    FromDeriveInput,
+    FromField,
+    FromMeta,
+};
 use proc_macro::TokenStream;
-
-use darling::ast::Data;
-use darling::util::{Flag, Ignored, Override, SpannedValue};
-use darling::{Error, FromDeriveInput, FromField, FromMeta};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Path, Type};
-use syn::{Ident, PathSegment};
+use syn::{parse_macro_input, DeriveInput, Ident, Path, PathSegment, Type};
 
 fn default_core_crate() -> Path {
     syn::parse_str("sg_core").expect("a path")
@@ -41,7 +44,7 @@ trait InheritAttrExt {
 
 impl InheritAttrExt for Override<InheritAttr> {
     fn is_flatten(&self) -> bool {
-        matches!(self, Override::Explicit(InheritAttr { flatten }) if flatten.is_present())
+        matches!(self, Self::Explicit(InheritAttr { flatten }) if flatten.is_present())
     }
 }
 

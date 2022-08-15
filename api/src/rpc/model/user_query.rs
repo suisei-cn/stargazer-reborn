@@ -18,15 +18,15 @@ impl UserQuery {
     #[must_use]
     pub fn as_document(&self) -> Document {
         match self {
-            UserQuery::ById { user_id: id } => doc! { "id": id },
-            UserQuery::ByIm { im, im_payload } => doc! { "im": im, "im_payload": im_payload },
+            Self::ById { user_id: id } => doc! { "id": id },
+            Self::ByIm { im, im_payload } => doc! { "im": im, "im_payload": im_payload },
         }
     }
 
     pub fn as_error(&self) -> ApiError {
         match self {
-            UserQuery::ById { user_id: id } => ApiError::user_not_found_with_id(id),
-            UserQuery::ByIm { im, im_payload } => ApiError::user_not_found_with_im(im, im_payload),
+            Self::ById { user_id: id } => ApiError::user_not_found_with_id(id),
+            Self::ByIm { im, im_payload } => ApiError::user_not_found_with_im(im, im_payload),
         }
     }
 }
@@ -62,7 +62,6 @@ mod test {
     use crate::model::UserQuery;
 
     #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-
     struct Test {
         #[serde(flatten)]
         query: UserQuery,
