@@ -7,11 +7,12 @@ edition = "2021"
 [features]
 mq = ["lapin", "tokio-reactor-trait", "tokio-executor-trait"]
 mock = ["tokio/sync", "tokio-stream/sync"]
-config = ["figment", "core_derive"]
+config = ["figment", "core_derive", "dotenvy"]
 
 [dependencies]
 async-trait = "0.1"
 core_derive = { path = "../core_derive", optional = true }
+dotenvy = { version = "0.15", optional = true }
 eyre = "0.6"
 figment = { version = "0.10", features = ["env"], optional = true }
 futures-util = { version = "0.3", features = ["sink"] }
