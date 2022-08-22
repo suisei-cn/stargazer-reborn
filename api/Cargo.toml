@@ -14,7 +14,7 @@ http            = "0.2.8"
 tracing         = "0.1.36"
 futures         = "0.3.23"
 mod_use         = "0.2.0"
-serde_json      = "1.0.83"
+serde_json      = "1.0.85"
 http-serde      = "1.1.0"
 humantime-serde = "1.1.1"
 serde           = { version = "1.0.143", features = ["derive"] }
