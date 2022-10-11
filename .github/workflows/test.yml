@@ -55,9 +55,10 @@ jobs:
         name: Setup Cargo Toolchain 🛎️
       - uses: Swatinem/rust-cache@v1
       - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.7.0
+        uses: supercharge/mongodb-github-action@1.8.0
         with:
           mongodb-replica-set: rs0
+          mongodb-version: "6.0"
       - uses: actions-rs/cargo@v1
         name: Prepare cargo-nextest 🛎️
         with:
