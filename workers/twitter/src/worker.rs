@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use base::Worker;
 use egg_mode::{tweet::user_timeline, user::UserID, Token};
 use eyre::Result;
 use futures_util::StreamExt;
@@ -10,11 +11,9 @@ use serde_json::Value;
 use sg_core::{
     models::{Event, Task},
     mq::MessageQueue,
-    protocol::WorkerRpc,
     utils::ScopedJoinHandle,
 };
 use tap::TapOptional;
-use tarpc::context::Context;
 use tokio::time::{interval, sleep};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -48,13 +47,8 @@ impl TwitterWorker {
     }
 }
 
-#[tarpc::server]
-impl WorkerRpc for TwitterWorker {
-    async fn ping(self, _: Context, id: u64) -> u64 {
-        id
-    }
-
-    async fn add_task(self, _: Context, task: Task) -> bool {
+impl Worker for TwitterWorker {
+    fn add_task(&self, task: Task) -> bool {
         let mut tasks = self.tasks.lock();
         if tasks.contains_key(&task.id.into()) {
             // If the task is already running, do nothing.
@@ -81,22 +75,20 @@ impl WorkerRpc for TwitterWorker {
         let token = self.token.clone();
         let poll_interval = self.interval;
 
-        let fut = async move {
-            loop {
-                info!(user_id=?id, "Spawning twitter task");
-                if let Err(error) = twitter_task(
-                    id.clone(),
-                    &token,
-                    task.entity.into(),
-                    &*self.mq,
-                    poll_interval,
-                )
-                .await
-                {
-                    error!(?error, "Failed to fetch timeline");
+        let fut = {
+            let mq = self.mq.clone();
+            async move {
+                loop {
+                    info!(user_id=?id, "Spawning twitter task");
+                    if let Err(error) =
+                        twitter_task(id.clone(), &token, task.entity.into(), &*mq, poll_interval)
+                            .await
+                    {
+                        error!(?error, "Failed to fetch timeline");
 
-                    // Sleep to avoid looping if the task always fails.
-                    sleep(poll_interval).await;
+                        // Sleep to avoid looping if the task always fails.
+                        sleep(poll_interval).await;
+                    }
                 }
             }
         };
@@ -107,26 +99,17 @@ impl WorkerRpc for TwitterWorker {
         true
     }
 
-    async fn remove_task(self, _: Context, id: Uuid) -> bool {
+    fn remove_task(&self, id: Uuid) -> bool {
         self.tasks
             .lock()
             .remove(&id)
             .tap_some(|_| info!(task_id=?id, "Removing task"))
             .is_some()
     }
-
-    async fn tasks(self, _: Context) -> Vec<Task> {
-        self.tasks
-            .lock()
-            .values()
-            .map(|(task, _)| task)
-            .cloned()
-            .collect()
-    }
 }
 
-// Fetch the timeline for the given user and send the tweets to the message
-// queue.
+/// Fetch the timeline for the given user and send the tweets to the message
+/// queue.
 async fn twitter_task(
     user_id: UserID,
     token: &Token,

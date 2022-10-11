@@ -1,13 +1,14 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
-use std::{fmt::Debug, io::Write};
+use std::fmt::Debug;
 
 use chrono::{NaiveDateTime, Utc};
 use diesel::{
-    backend::Backend,
+    backend::{Backend, RawValue},
     deserialize::FromSql,
-    serialize::{Output, ToSql},
+    serialize::{IsNull, Output, ToSql},
     sql_types,
+    sqlite::Sqlite,
     AsExpression,
     FromSqlRow,
     Insertable,
@@ -51,21 +52,19 @@ where
     DB: Backend,
     String: FromSql<sql_types::Text, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> diesel::deserialize::Result<Self> {
+    fn from_sql(bytes: RawValue<'_, DB>) -> diesel::deserialize::Result<Self> {
         let s = String::from_sql(bytes)?;
         Ok(Self(serde_json::from_str(&s)?))
     }
 }
 
-impl<T, DB> ToSql<sql_types::Text, DB> for Json<T>
+impl<T> ToSql<sql_types::Text, Sqlite> for Json<T>
 where
     T: Serialize + Debug,
-    DB: Backend,
-    String: ToSql<sql_types::Text, DB>,
 {
-    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> diesel::serialize::Result {
-        let s = serde_json::to_string(&self.0)?;
-        s.to_sql(out)
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> diesel::serialize::Result {
+        out.set_value(serde_json::to_string(&self.0)?);
+        Ok(IsNull::No)
     }
 }
 
@@ -78,19 +77,15 @@ where
     DB: Backend,
     String: FromSql<sql_types::Text, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> diesel::deserialize::Result<Self> {
+    fn from_sql(bytes: RawValue<'_, DB>) -> diesel::deserialize::Result<Self> {
         let s = String::from_sql(bytes)?;
         Ok(Self(s.parse().unwrap()))
     }
 }
 
-impl<DB> ToSql<sql_types::Text, DB> for MiddlewaresWrapper
-where
-    DB: Backend,
-    String: ToSql<sql_types::Text, DB>,
-{
-    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> diesel::serialize::Result {
-        let s = self.0.to_string();
-        s.to_sql(out)
+impl ToSql<sql_types::Text, Sqlite> for MiddlewaresWrapper {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> diesel::serialize::Result {
+        out.set_value(self.0.to_string());
+        Ok(IsNull::No)
     }
 }

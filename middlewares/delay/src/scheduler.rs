@@ -87,10 +87,10 @@ impl Scheduler {
         }
 
         if persist {
-            let conn = self.pool.get().unwrap();
+            let mut conn = self.pool.get().unwrap();
             let r = diesel::insert_into(delayed_messages::table())
                 .values(&msg)
-                .execute(&conn);
+                .execute(&mut conn);
             match r {
                 Ok(count) if count == 0 => {
                     error!(
@@ -116,9 +116,9 @@ impl Scheduler {
 
     pub fn remove_task(&self, task_id: i64) {
         if self.delayed_messages.lock().remove(&task_id).is_some() {
-            let conn = self.pool.get().expect("No db conn available");
+            let mut conn = self.pool.get().expect("No db conn available");
             if let Err(error) =
-                diesel::delete(delayed_messages.filter(id.eq(task_id))).execute(&conn)
+                diesel::delete(delayed_messages.filter(id.eq(task_id))).execute(&mut conn)
             {
                 error!(?error, "Failed to remove task from database");
             }
@@ -132,8 +132,8 @@ impl Scheduler {
     }
 
     pub fn load(self: &Arc<Self>) {
-        let conn = self.pool.get().expect("No db conn available");
-        let results = delayed_messages.load::<DelayedMessage>(&conn);
+        let mut conn = self.pool.get().expect("No db conn available");
+        let results = delayed_messages.load::<DelayedMessage>(&mut conn);
         match results {
             Ok(messages) => {
                 for message in messages {
@@ -147,10 +147,10 @@ impl Scheduler {
     }
 
     pub fn cleanup(&self) {
-        let conn = self.pool.get().expect("No db conn available");
+        let mut conn = self.pool.get().expect("No db conn available");
         let r = diesel::delete(delayed_messages::table())
             .filter(deliver_at.lt(now))
-            .execute(&conn);
+            .execute(&mut conn);
         match r {
             Ok(count) => {
                 info!(count = %count, "Removed misfired delayed messages from database");
@@ -164,7 +164,7 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{ops::DerefMut, sync::Arc};
 
     use chrono::Utc;
     use diesel::{
@@ -172,6 +172,7 @@ mod tests {
         RunQueryDsl,
         SqliteConnection,
     };
+    use diesel_migrations::MigrationHarness;
     use sg_core::{
         models::Event,
         mq::{mock::MockMQ, Middlewares},
@@ -179,7 +180,7 @@ mod tests {
     use tokio::time::sleep;
     use uuid::Uuid;
 
-    use crate::{delayed_messages, embedded_migrations, DelayedMessage, Scheduler};
+    use crate::{delayed_messages, DelayedMessage, Scheduler, MIGRATIONS};
 
     #[derive(Debug, Eq, PartialEq)]
     enum TestAction {
@@ -209,8 +210,12 @@ mod tests {
         let db_path = temp_file.path().to_string_lossy().to_string();
 
         // Prepare the db.
-        let pool = Pool::new(ConnectionManager::new(&db_path)).unwrap();
-        embedded_migrations::run(&pool.get().unwrap()).unwrap();
+        let pool = Pool::new(ConnectionManager::<SqliteConnection>::new(&db_path)).unwrap();
+        pool.get()
+            .unwrap()
+            .deref_mut()
+            .run_pending_migrations(MIGRATIONS)
+            .unwrap();
 
         let mq = MockMQ::default();
 
@@ -274,8 +279,8 @@ mod tests {
 
                 // And we make sure the entry in db is removed.
                 let pool = Pool::new(ConnectionManager::<SqliteConnection>::new(&db_path)).unwrap();
-                let conn = pool.get().expect("No db conn available");
-                let results = delayed_messages.load::<DelayedMessage>(&conn).unwrap();
+                let mut conn = pool.get().expect("No db conn available");
+                let results = delayed_messages.load::<DelayedMessage>(&mut conn).unwrap();
                 assert!(
                     results.is_empty(),
                     "There should be no delayed messages in db"
