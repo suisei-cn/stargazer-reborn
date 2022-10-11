@@ -77,7 +77,7 @@ impl WorkerGroup {
     /// Lock the worker group and mutate its state.
     pub async fn with<O>(&self, f: impl FnOnce(&mut WorkerGroupImpl) -> O + Send) -> O {
         let mut lock = self.inner.lock().await;
-        let output = f(&mut *lock);
+        let output = f(&mut lock);
         drop(lock);
         output
     }
@@ -393,7 +393,7 @@ impl WorkerGroupImpl {
                 .iter()
                 .filter_map(|(id, BoundTask { task: _, worker })| (worker.is_some()
                     || count_unallocated_task)
-                    .then(|| id))
+                    .then_some(id))
                 .copied()
                 .collect(),
             "tasks are not synchronized between worker-task and task-worker maps"

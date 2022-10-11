@@ -158,7 +158,7 @@ impl MessageQueue for RabbitMQ {
                         .chain(middlewares.into_iter())
                         .join("."),
                     BasicPublishOptions::default(),
-                    &*serde_json::to_vec(&event)?,
+                    &serde_json::to_vec(&event)?,
                     BasicProperties::default(),
                 )
                 .await?,

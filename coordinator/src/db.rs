@@ -32,8 +32,8 @@ impl DB {
     /// Returns an error if the database connection fails.
     pub async fn new(app: App, config: Config) -> Result<Self> {
         let client = Client::with_uri_str(config.mongo_uri).await?;
-        let db = client.database(&*config.mongo_db);
-        let collection = db.collection(&*config.mongo_collection);
+        let db = client.database(&config.mongo_db);
+        let collection = db.collection(&config.mongo_collection);
 
         Ok(Self {
             app,

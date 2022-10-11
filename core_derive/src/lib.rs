@@ -212,7 +212,7 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
                     // Only `default_str` is present.
                     (None, Some(default_str), None) => vec![Action::Append(Field {
                         key,
-                        value: value_from_str(&serde_json, &*default_str),
+                        value: value_from_str(&serde_json, &default_str),
                     })],
                     // Only `default` is present.
                     (Some(default), None, None) => {
