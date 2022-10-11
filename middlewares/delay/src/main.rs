@@ -3,14 +3,15 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use std::sync::Arc;
+use std::{ops::DerefMut, sync::Arc};
 
 use chrono::NaiveDateTime;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     SqliteConnection,
 };
-use eyre::{Context, ContextCompat, Result};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness};
+use eyre::{eyre, Context, ContextCompat, Result};
 use futures_util::StreamExt;
 use sg_core::{
     models::Event,
@@ -33,7 +34,7 @@ mod db;
 mod scheduler;
 mod schema;
 
-embed_migrations!();
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -50,7 +51,9 @@ async fn main() -> Result<()> {
     ))
     .wrap_err("Failed to connect to SQLite database")?;
 
-    embedded_migrations::run(&pool.get()?).wrap_err("Failed to run migration script")?;
+    if let Err(e) = pool.get()?.deref_mut().run_pending_migrations(MIGRATIONS) {
+        return Err(eyre!(e).wrap_err("Failed to run migrations"));
+    }
 
     let mq = RabbitMQ::new(&config.amqp_url, &config.amqp_exchange)
         .await
