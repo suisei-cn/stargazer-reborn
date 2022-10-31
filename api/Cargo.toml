@@ -9,7 +9,7 @@ edition = "2021"
 sg-core = { package = "core", path = "../core", features = ["config"] }
 sg-auth = { package = "auth", path = "../auth" }
 
-url             = "2.2.2"
+url             = "2.3.0"
 http            = "0.2.8"
 tracing         = "0.1.36"
 futures         = "0.3.25"
