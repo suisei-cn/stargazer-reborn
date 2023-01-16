@@ -31,7 +31,7 @@ tokio-stream = { version = "0.1", features = ["sync"], optional = true }
 tokio-tungstenite = "0.18"
 tracing = "0.1"
 url = { version = "2.3.1", features = ["serde"] }
-uuid = "0.8"
+uuid = "1.1"
 
 [dev-dependencies]
 core_derive = { path = "../core_derive" }
